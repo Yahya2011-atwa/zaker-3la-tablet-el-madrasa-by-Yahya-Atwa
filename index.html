@@ -272,7 +272,7 @@
         canvas.draw-canvas { 
             position: absolute; top: 0; left: 0; border-radius: 12px; 
             touch-action: none; z-index: 2; width: 100%; height: 100%; 
-            pointer-events: auto; 
+            pointer-events: none; 
         }
 
         .textLayer {
@@ -393,7 +393,7 @@
 
     <div id="home-screen">
         <div class="header">
-            <h2>Zaker by Yahya Atwa</h2>
+            <h2>Zaker by Yahya Atwa :</h2>
             <div>
                 <input type="file" id="pdfUploader" accept="application/pdf" style="display:none;">
                 <button class="btn-apple apple-glass" onclick="document.getElementById('pdfUploader').click()">＋ Open PDF</button>
@@ -412,6 +412,7 @@
 
                 <button id="fullscreenBtn" onclick="toggleFullScreen()" title="Fullscreen">⛶</button>
                 <button id="viewModeToggleBtn" class="btn-view-mode" onclick="toggleViewMode()">↔️ Horizontal</button>
+                <button id="bgToggleBtn" onclick="toggleBackgroundPanel()" title="Page Layout">🎨</button>
 
                 <span style="opacity:0.2">|</span>
                 <button id="undoBtn" onclick="undo()" title="Undo">↩️</button>
@@ -1210,10 +1211,9 @@
 
         function updateCanvasPointerEvents() {
             document.querySelectorAll('canvas.draw-canvas').forEach(c => {
-                c.style.pointerEvents = 'auto';
+                c.style.pointerEvents = currentTool ? 'auto' : 'none';
             });
         }
-
 
         function showSizeSlider(toolName) {
             const panel = document.getElementById('size-slider-panel');
