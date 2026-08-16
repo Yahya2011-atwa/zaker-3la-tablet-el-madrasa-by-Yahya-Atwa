@@ -1,6 +1,6 @@
 {
-  "name": "PDF Notebook Pro",
-  "short_name": "PDF Pro",
+  "name": "Zaker by Yahya Atwa",
+  "short_name": "Zaker",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#ffffff",
