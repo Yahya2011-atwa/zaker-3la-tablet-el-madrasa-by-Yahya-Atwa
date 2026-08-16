@@ -12,6 +12,7 @@
 
     <!-- PWA Manifest -->
     <meta name="theme-color" content="#000000">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <title>Zaker by Yahya Atwa</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
     <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
@@ -471,7 +472,6 @@
             });
         }
 
-        // التقاط حدث التثبيت
         let deferredPrompt;
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault();
@@ -518,6 +518,7 @@
 
         let pageObserver = null;
         let renderedPages = new Set();
+        let saveTimeout;
 
         document.addEventListener('pointerdown', (e) => {
             if (isEditMode && !e.target.closest('#bottom-thumbnails-bar')) {
@@ -649,8 +650,8 @@
             tx.objectStore("files").delete(id).onsuccess = () => loadHomeFiles();
         }
 
-        function goHome() {
-            if (currentFileId) savePageData(currentPage);
+        async function goHome() {
+            if (currentFileId) await savePageDataNow(currentPage);
             toggleEditMode(false);
             document.getElementById('editor-screen').style.display = 'none';
             document.getElementById('home-screen').style.display = 'flex';
@@ -708,54 +709,165 @@
             };
         }
 
-        async function addBlankPage() {
-            if (!currentFileId || !pdfDoc) return;
-            
-            savePageData(currentPage);
-            updateAutosaveIndicator('saving');
-            
-            const record = await new Promise((resolve) => {
-                const tx = db.transaction("files", "readonly");
-                tx.objectStore("files").get(currentFileId).onsuccess = e => resolve(e.target.result);
-            });
-            if (!record) return;
-
-            const pdfLibDoc = await PDFLib.PDFDocument.load(record.data);
-            const pages = pdfLibDoc.getPages();
-            const currPage = pages[pageOrder[currentPage - 1] - 1] || pages[0];
-            const { width, height } = currPage.getSize();
-            
-            const insertIndex = pageOrder[currentPage - 1];
-            pdfLibDoc.insertPage(insertIndex, [width, height]);
-            const newPdfBytes = await pdfLibDoc.save();
-            
-            const newActualPageNum = insertIndex + 1;
-            
-            for (let i = 0; i < pageOrder.length; i++) {
-                if (pageOrder[i] >= newActualPageNum) {
-                    pageOrder[i]++;
+        function shiftAnnotations(actualPage, direction) {
+            const shiftDict = (dict) => {
+                const newDict = {};
+                for (const key in dict) {
+                    const k = parseInt(key);
+                    if (direction === 'insert') {
+                        if (k >= actualPage) newDict[k + 1] = dict[key];
+                        else newDict[k] = dict[key];
+                    } else if (direction === 'delete') {
+                        if (k > actualPage) newDict[k - 1] = dict[key];
+                        else if (k < actualPage) newDict[k] = dict[key];
+                    }
                 }
-            }
-            
-            pageOrder.splice(currentPage, 0, newActualPageNum);
+                return newDict;
+            };
 
-            record.data = newPdfBytes;
-            record.pageOrder = pageOrder;
-            
-            await new Promise((resolve) => {
-                const tx2 = db.transaction("files", "readwrite");
-                tx2.objectStore("files").put(record).onsuccess = () => resolve();
-            });
-            
-            const targetPage = currentPage + 1;
-            pdfDoc = await pdfjsLib.getDocument({ data: newPdfBytes }).promise;
-            await initVirtualViewer();
-            goToPage(targetPage); 
-            updateAutosaveIndicator('saved');
+            currentDrawings = shiftDict(currentDrawings);
+            currentTexts = shiftDict(currentTexts);
+            currentImages = shiftDict(currentImages);
+        }
+
+        // --- تم تحديث وتأمين دالة الإضافة ---
+        async function addBlankPage() {
+            try {
+                if (!currentFileId || !pdfDoc) return;
+                
+                await savePageDataNow(currentPage);
+                updateAutosaveIndicator('saving');
+                
+                const record = await new Promise((resolve, reject) => {
+                    const tx = db.transaction("files", "readonly");
+                    const req = tx.objectStore("files").get(currentFileId);
+                    req.onsuccess = e => resolve(e.target.result);
+                    req.onerror = err => reject(err);
+                });
+                
+                if (!record) throw new Error("Document not found in database.");
+                if (typeof PDFLib === 'undefined') throw new Error("PDFLib is not loaded. Please check internet connection.");
+
+                const pdfLibDoc = await PDFLib.PDFDocument.load(record.data);
+                const pages = pdfLibDoc.getPages();
+                const currPage = pages[pageOrder[currentPage - 1] - 1] || pages[0];
+                const { width, height } = currPage.getSize();
+                
+                const insertIndex = pageOrder[currentPage - 1];
+                pdfLibDoc.insertPage(insertIndex, [width, height]);
+                const newPdfBytes = await pdfLibDoc.save();
+                
+                const newActualPageNum = insertIndex + 1;
+                shiftAnnotations(newActualPageNum, 'insert');
+
+                for (let i = 0; i < pageOrder.length; i++) {
+                    if (pageOrder[i] >= newActualPageNum) pageOrder[i]++;
+                }
+                pageOrder.splice(currentPage, 0, newActualPageNum);
+
+                record.data = newPdfBytes;
+                record.pageOrder = pageOrder;
+                record.drawings = currentDrawings;
+                record.texts = currentTexts;
+                record.images = currentImages;
+                
+                await new Promise((resolve, reject) => {
+                    const tx2 = db.transaction("files", "readwrite");
+                    const req2 = tx2.objectStore("files").put(record);
+                    req2.onsuccess = () => resolve();
+                    req2.onerror = err => reject(err);
+                });
+                
+                const targetPage = currentPage + 1;
+
+                // تحرير الذاكرة من الملف القديم لتجنب الـ Crash
+                if (pdfDoc) {
+                    try { await pdfDoc.destroy(); } catch(e){}
+                }
+
+                // تمرير نسخة جديدة من البيانات للمكتبة
+                pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(newPdfBytes) }).promise;
+                await initVirtualViewer();
+                goToPage(targetPage); 
+                updateAutosaveIndicator('saved');
+
+            } catch (error) {
+                console.error(error);
+                alert("حدث خطأ أثناء إضافة الصفحة: " + error.message);
+                updateAutosaveIndicator('saved');
+            }
         }
 
         function confirmDeleteCurrentPage() {
             confirmDeletePage(currentPage);
+        }
+        
+        async function confirmDeletePage(pageIndex) {
+            if (pageOrder.length <= 1) {
+                alert("Cannot delete the only remaining page.");
+                return;
+            }
+            if (confirm(`هل أنت متأكد من حذف الصفحة رقم ${pageIndex}؟`)) {
+                await deletePage(pageIndex);
+            }
+        }
+
+        // --- تم تحديث وتأمين دالة الحذف ---
+        async function deletePage(pageIndex) {
+            try {
+                await savePageDataNow(currentPage);
+                updateAutosaveIndicator('saving');
+
+                const record = await new Promise((resolve, reject) => {
+                    const tx = db.transaction("files", "readonly");
+                    const req = tx.objectStore("files").get(currentFileId);
+                    req.onsuccess = e => resolve(e.target.result);
+                    req.onerror = err => reject(err);
+                });
+                if (!record) throw new Error("Document not found.");
+
+                const actualToRemove = pageOrder[pageIndex - 1];
+                const pdfLibDoc = await PDFLib.PDFDocument.load(record.data);
+                
+                pdfLibDoc.removePage(actualToRemove - 1);
+                const newPdfBytes = await pdfLibDoc.save();
+
+                pageOrder.splice(pageIndex - 1, 1);
+                for (let i = 0; i < pageOrder.length; i++) {
+                    if (pageOrder[i] > actualToRemove) pageOrder[i]--;
+                }
+
+                shiftAnnotations(actualToRemove, 'delete');
+
+                record.data = newPdfBytes;
+                record.pageOrder = pageOrder;
+                record.drawings = currentDrawings;
+                record.texts = currentTexts;
+                record.images = currentImages;
+
+                await new Promise((resolve, reject) => {
+                    const tx2 = db.transaction("files", "readwrite");
+                    const req2 = tx2.objectStore("files").put(record);
+                    req2.onsuccess = () => resolve();
+                    req2.onerror = err => reject(err);
+                });
+
+                if (currentPage > pageOrder.length) currentPage = pageOrder.length;
+
+                // تحرير الذاكرة
+                if (pdfDoc) {
+                    try { await pdfDoc.destroy(); } catch(e){}
+                }
+
+                pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(newPdfBytes) }).promise;
+                await initVirtualViewer();
+                updateAutosaveIndicator('saved');
+
+            } catch (error) {
+                console.error(error);
+                alert("حدث خطأ أثناء حذف الصفحة: " + error.message);
+                updateAutosaveIndicator('saved');
+            }
         }
 
         function toggleViewMode() {
@@ -942,58 +1054,6 @@
             } else {
                 container.classList.remove('edit-mode');
             }
-        }
-
-        async function confirmDeletePage(pageIndex) {
-            if (pageOrder.length <= 1) {
-                alert("Cannot delete the only remaining page.");
-                return;
-            }
-            if (confirm(`هل أنت تأكد من حذف الصفحة رقم ${pageIndex}؟`)) {
-                deletePage(pageIndex);
-            }
-        }
-
-        async function deletePage(pageIndex) {
-            savePageData(currentPage);
-            updateAutosaveIndicator('saving');
-
-            const record = await new Promise((resolve) => {
-                const tx = db.transaction("files", "readonly");
-                tx.objectStore("files").get(currentFileId).onsuccess = e => resolve(e.target.result);
-            });
-            if (!record) return;
-
-            const actualToRemove = pageOrder[pageIndex - 1];
-            const pdfLibDoc = await PDFLib.PDFDocument.load(record.data);
-            
-            pdfLibDoc.removePage(actualToRemove - 1);
-            const newPdfBytes = await pdfLibDoc.save();
-
-            pageOrder.splice(pageIndex - 1, 1);
-            for (let i = 0; i < pageOrder.length; i++) {
-                if (pageOrder[i] > actualToRemove) {
-                    pageOrder[i]--;
-                }
-            }
-
-            delete currentDrawings[actualToRemove];
-            delete currentTexts[actualToRemove];
-            delete currentImages[actualToRemove];
-
-            record.data = newPdfBytes;
-            record.pageOrder = pageOrder;
-
-            await new Promise((resolve) => {
-                const tx2 = db.transaction("files", "readwrite");
-                tx2.objectStore("files").put(record).onsuccess = () => resolve();
-            });
-
-            if (currentPage > pageOrder.length) currentPage = pageOrder.length;
-
-            pdfDoc = await pdfjsLib.getDocument({ data: newPdfBytes }).promise;
-            await initVirtualViewer();
-            updateAutosaveIndicator('saved');
         }
 
         function updateThumbnailsAndPagesIndexes() {
@@ -1342,59 +1402,80 @@
             }
         }
 
-        let saveTimeout;
+        // --- تم تأمين دالة الحفظ بـ Try/Catch ---
+        function savePageDataNow(displayIndex) {
+            return new Promise((resolve, reject) => {
+                try {
+                    clearTimeout(saveTimeout);
+                    const wrapper = document.querySelector(`.page-wrapper[data-page-num="${displayIndex}"]`);
+                    if (wrapper) {
+                        const actualPage = wrapper.dataset.actualPage;
+                        const drawCanvas = wrapper.querySelector('.draw-canvas');
+                        if (drawCanvas) {
+                            currentDrawings[actualPage] = drawCanvas.toDataURL();
+                        }
+                        
+                        const textsOnPage = [];
+                        wrapper.querySelectorAll('.text-node-wrapper').forEach(wrapperNode => {
+                            const node = wrapperNode.querySelector('.text-node');
+                            textsOnPage.push({
+                                text: node.innerText,
+                                x: parseFloat(wrapperNode.dataset.baseX) || 0,
+                                y: parseFloat(wrapperNode.dataset.baseY) || 0,
+                                color: node.style.color,
+                                fontSize: parseFloat(node.style.fontSize) || 18
+                            });
+                        });
+                        currentTexts[actualPage] = textsOnPage;
+
+                        const imagesOnPage = [];
+                        wrapper.querySelectorAll('.img-node').forEach(node => {
+                            const img = node.querySelector('img');
+                            imagesOnPage.push({
+                                src: img.src,
+                                x: parseFloat(node.dataset.baseX) || 0,
+                                y: parseFloat(node.dataset.baseY) || 0,
+                                w: parseFloat(node.style.width),
+                                h: parseFloat(node.style.height)
+                            });
+                        });
+                        currentImages[actualPage] = imagesOnPage;
+                    }
+
+                    if (!currentFileId) { resolve(); return; }
+
+                    const tx = db.transaction("files", "readwrite");
+                    const store = tx.objectStore("files");
+                    const getReq = store.get(currentFileId);
+                    
+                    getReq.onsuccess = e => {
+                        const data = e.target.result;
+                        if (data) {
+                            data.drawings = currentDrawings;
+                            data.texts = currentTexts;
+                            data.images = currentImages;
+                            data.pageOrder = [...pageOrder];
+                            const putReq = store.put(data);
+                            putReq.onsuccess = () => resolve();
+                            putReq.onerror = err => reject(err);
+                        } else {
+                            resolve();
+                        }
+                    };
+                    getReq.onerror = err => reject(err);
+                } catch (err) {
+                    reject(err);
+                }
+            });
+        }
+
         function savePageData(displayIndex) {
             updateAutosaveIndicator('saving');
             clearTimeout(saveTimeout);
             saveTimeout = setTimeout(() => {
-                const wrapper = document.querySelector(`.page-wrapper[data-page-num="${displayIndex}"]`);
-                if (!wrapper) return;
-
-                const actualPage = wrapper.dataset.actualPage;
-                const drawCanvas = wrapper.querySelector('.draw-canvas');
-                if (drawCanvas) {
-                    currentDrawings[actualPage] = drawCanvas.toDataURL();
-                }
-                
-                const textsOnPage = [];
-                wrapper.querySelectorAll('.text-node-wrapper').forEach(wrapperNode => {
-                    const node = wrapperNode.querySelector('.text-node');
-                    textsOnPage.push({
-                        text: node.innerText,
-                        x: parseFloat(wrapperNode.dataset.baseX) || 0,
-                        y: parseFloat(wrapperNode.dataset.baseY) || 0,
-                        color: node.style.color,
-                        fontSize: parseFloat(node.style.fontSize) || 18
-                    });
-                });
-                currentTexts[actualPage] = textsOnPage;
-
-                const imagesOnPage = [];
-                wrapper.querySelectorAll('.img-node').forEach(node => {
-                    const img = node.querySelector('img');
-                    imagesOnPage.push({
-                        src: img.src,
-                        x: parseFloat(node.dataset.baseX) || 0,
-                        y: parseFloat(node.dataset.baseY) || 0,
-                        w: parseFloat(node.style.width),
-                        h: parseFloat(node.style.height)
-                    });
-                });
-                currentImages[actualPage] = imagesOnPage;
-
-                const tx = db.transaction("files", "readwrite");
-                const store = tx.objectStore("files");
-                store.get(currentFileId).onsuccess = e => {
-                    const data = e.target.result;
-                    if (data) {
-                        data.drawings = currentDrawings;
-                        data.texts = currentTexts;
-                        data.images = currentImages;
-                        data.pageOrder = [...pageOrder];
-                        store.put(data);
-                        updateAutosaveIndicator('saved');
-                    }
-                };
+                savePageDataNow(displayIndex).then(() => {
+                    updateAutosaveIndicator('saved');
+                }).catch(err => console.error("Autosave Error:", err));
             }, 300);
         }
 
@@ -1649,7 +1730,7 @@
 
         async function exportFullPDF() {
             if (!pdfDoc) return;
-            savePageData(currentPage);
+            await savePageDataNow(currentPage);
 
             const tx = db.transaction("files", "readonly");
             tx.objectStore("files").get(currentFileId).onsuccess = async e => {
