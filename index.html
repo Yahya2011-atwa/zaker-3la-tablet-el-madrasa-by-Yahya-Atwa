@@ -290,36 +290,76 @@
         }
 
         /* تحسين التصفح والوصول لأي ركن بحرية تامة بغض النظر عن الزوم */
-        #viewer-container { 
-            flex: 1; width: 100%; height: 100%; 
-            overflow: auto; 
-            display: flex; 
-            align-items: center;
-            justify-content: center;
-            padding: 200px 50vw 200px 50vw; 
+        #viewer-container {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            min-width: 0;
+            min-height: 0;
+            overflow: auto;
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            flex-direction: row;
+            gap: 0;
+            padding: 180px;
             touch-action: pan-x pan-y pinch-zoom;
             -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            scroll-behavior: auto;
             will-change: scroll-position;
+            scrollbar-gutter: stable;
         }
 
         #viewer-container.horizontal .page-wrapper { display: none; }
-        #viewer-container.horizontal .page-wrapper.active { display: block; animation: fadeIn 0.25s ease-in-out; }
+        #viewer-container.horizontal .page-wrapper.active {
+            display: block;
+            animation: fadeIn 0.25s ease-in-out;
+        }
 
-        #viewer-container.vertical { gap: 40px; flex-direction: column; justify-content: flex-start; }
+        #viewer-container.vertical {
+            gap: 40px;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+        }
+
         #viewer-container.vertical .page-wrapper { display: block; }
 
         @keyframes fadeIn {
             from { opacity: 0; transform: scale(0.98); }
             to { opacity: 1; transform: scale(1); }
         }
-        
-        .page-wrapper { 
-            position: relative; border-radius: 12px; box-shadow: 0 12px 35px rgba(0,0,0,0.12); 
-            margin: auto; flex-shrink: 0; transition: background 0.3s ease;
+
+        .page-wrapper {
+            position: relative;
+            border-radius: 12px;
+            box-shadow: 0 12px 35px rgba(0,0,0,0.12);
+            flex: 0 0 auto;
+            margin: 0 auto;
+            transition: background 0.3s ease;
             min-height: 500px;
         }
-        
-        canvas.pdf-render { display: block; border-radius: 12px; width: 100%; height: 100%; mix-blend-mode: multiply; }
+
+        /* مساحة أمان حول الصفحة للوصول لكل حافاتها بعد التكبير */
+        #viewer-container::before,
+        #viewer-container::after {
+            content: "";
+            flex: 0 0 1px;
+        }
+
+        /* عند كِبَر الصفحة لا نعتمد على transform؛ الحجم الحقيقي هو مساحة الـ scroll */
+        #viewer-container.horizontal .page-wrapper.active {
+            margin-left: max(0px, calc((100vw - 360px) / 2));
+            margin-right: max(0px, calc((100vw - 360px) / 2));
+        }
+
+        #viewer-container.vertical .page-wrapper {
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+                canvas.pdf-render { display: block; border-radius: 12px; width: 100%; height: 100%; mix-blend-mode: multiply; }
         canvas.draw-canvas { 
             position: absolute; top: 0; left: 0; border-radius: 12px; 
             touch-action: none; z-index: 2; width: 100%; height: 100%; 
@@ -559,7 +599,10 @@
         .img-node .delete-img { position: absolute; top: -8px; right: -8px; background: #ff3b30; color: white; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; }
         .resize-handle { position: absolute; width: 12px; height: 12px; background: #1c1c1e; border: 2px solid #fff; border-radius: 50%; bottom: -6px; right: -6px; cursor: se-resize; z-index: 5; }
 
-        @media (orientation: landscape) { #toolbar-container { top: 18px; } #viewer-container { padding-top: 120px; } }
+        @media (orientation: landscape) {
+            #toolbar-container { top: 18px; }
+            #viewer-container { padding: 180px; }
+        }
     </style>
 </head>
 <body>
@@ -698,7 +741,7 @@
         </div>
     </div>
 
-    <script>
+<script>
         function autoEnableFullScreen() {
             if (!document.fullscreenElement) {
                 document.documentElement.requestFullscreen().catch(() => {});
@@ -713,14 +756,16 @@
             const batterySpan = document.getElementById('battery-display');
             
             const now = new Date();
-            timeSpan.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            if (timeSpan) {
+                timeSpan.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            }
 
             if (navigator.getBattery) {
                 navigator.getBattery().then(battery => {
                     const level = Math.round(battery.level * 100);
-                    batterySpan.innerText = (battery.charging ? "⚡ " : "🔋 ") + level + "%";
+                    if (batterySpan) batterySpan.innerText = (battery.charging ? "⚡ " : "🔋 ") + level + "%";
                 });
-            } else {
+            } else if (batterySpan) {
                 batterySpan.innerText = "🔋 100%";
             }
         }
@@ -887,16 +932,17 @@
 
         function toggleBackgroundPanel() {
             const panel = document.getElementById('background-panel');
+            if (!panel) return;
             if (panel.style.display === 'flex') {
                 panel.style.display = 'none';
-                document.getElementById('bgToggleBtn').classList.remove('active');
+                document.getElementById('bgToggleBtn')?.classList.remove('active');
             } else {
                 panel.style.display = 'flex';
-                document.getElementById('bgToggleBtn').classList.add('active');
-                hideSizeSlider();
+                document.getElementById('bgToggleBtn')?.classList.add('active');
+                if (typeof hideSizeSlider === 'function') hideSizeSlider();
                 currentTool = null; 
-                updateToolButtonsUI();
-                updateCanvasPointerEvents();
+                if (typeof updateToolButtonsUI === 'function') updateToolButtonsUI();
+                if (typeof updateCanvasPointerEvents === 'function') updateCanvasPointerEvents();
             }
         }
 
@@ -910,6 +956,7 @@
 
         function showUndoToast(message, restoreCallback) {
             const toast = document.getElementById('toast-container');
+            if (!toast) return;
             document.getElementById('toast-message').innerText = message;
             lastDeletedItem = restoreCallback;
             toast.classList.add('show');
@@ -926,11 +973,12 @@
                 lastDeletedItem();
                 lastDeletedItem = null;
             }
-            document.getElementById('toast-container').classList.remove('show');
+            document.getElementById('toast-container')?.classList.remove('show');
         }
 
         function updateAutosaveIndicator(status) {
             const indicator = document.getElementById('autosave-indicator');
+            if (!indicator) return;
             if (status === 'saving') {
                 indicator.style.color = '#ff9500';
                 indicator.innerText = '● Saving...';
@@ -950,7 +998,8 @@
 
         function selectColor(hex) {
             activeColor = hex;
-            document.getElementById('colorPicker').value = hex;
+            const picker = document.getElementById('colorPicker');
+            if (picker) picker.value = hex;
             recentColorsList = recentColorsList.filter(c => c.toLowerCase() !== hex.toLowerCase());
             recentColorsList.unshift(hex);
             if (recentColorsList.length > 5) recentColorsList.pop();
@@ -958,7 +1007,7 @@
 
             if (activeTextNode) {
                 activeTextNode.style.color = hex;
-                savePageData(currentPage);
+                if (typeof savePageData === 'function') savePageData(currentPage);
             }
         }
 
@@ -977,6 +1026,7 @@
 
         function loadHomeFiles() {
             const grid = document.getElementById('notesGrid');
+            if (!grid) return;
             grid.innerHTML = '';
             const tx = db.transaction("files", "readonly");
             tx.objectStore("files").getAll().onsuccess = e => {
@@ -1000,14 +1050,14 @@
         }
 
         async function goHome() {
-            if (currentFileId) await savePageDataNow(currentPage);
-            toggleEditMode(false);
+            if (currentFileId && typeof savePageDataNow === 'function') await savePageDataNow(currentPage);
+            if (typeof toggleEditMode === 'function') toggleEditMode(false);
             document.getElementById('editor-screen').style.display = 'none';
             document.getElementById('home-screen').style.display = 'flex';
             loadHomeFiles();
         }
 
-        document.getElementById('pdfUploader').addEventListener('change', e => {
+        document.getElementById('pdfUploader')?.addEventListener('change', e => {
             const file = e.target.files[0];
             if (!file) return;
             const reader = new FileReader();
@@ -1084,7 +1134,7 @@
             try {
                 if (!currentFileId || !pdfDoc) return;
                 
-                await savePageDataNow(currentPage);
+                if (typeof savePageDataNow === 'function') await savePageDataNow(currentPage);
                 updateAutosaveIndicator('saving');
                 
                 const record = await new Promise((resolve, reject) => {
@@ -1135,7 +1185,7 @@
 
                 pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(newPdfBytes) }).promise;
                 await initVirtualViewer();
-                goToPage(targetPage); 
+                if (typeof goToPage === 'function') goToPage(targetPage); 
                 updateAutosaveIndicator('saved');
 
             } catch (error) {
@@ -1157,7 +1207,7 @@
 
         async function deletePage(pageIndex) {
             try {
-                await savePageDataNow(currentPage);
+                if (typeof savePageDataNow === 'function') await savePageDataNow(currentPage);
                 updateAutosaveIndicator('saving');
 
                 const record = await new Promise((resolve, reject) => {
@@ -1220,6 +1270,7 @@
         function applyViewModeUI() {
             const container = document.getElementById('viewer-container');
             const toggleBtn = document.getElementById('viewModeToggleBtn');
+            if (!container || !toggleBtn) return;
 
             if (viewMode === 'vertical') {
                 container.className = 'vertical';
@@ -1227,14 +1278,15 @@
             } else {
                 container.className = 'horizontal';
                 toggleBtn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg> Horizontal`;
-                updatePageDisplay();
+                if (typeof updatePageDisplay === 'function') updatePageDisplay();
             }
-            applyZoomTransform();
+            if (typeof applyZoomTransform === 'function') applyZoomTransform();
         }
 
         function initVirtualViewer() {
             const container = document.getElementById('viewer-container');
             const thumbsContainer = document.getElementById('thumbnailsContainer');
+            if (!container || !thumbsContainer) return;
             container.innerHTML = '';
             thumbsContainer.innerHTML = '';
             renderedPages.clear();
@@ -1264,7 +1316,7 @@
                         }
                     }
                 });
-            }, { root: container, rootMargin: '300px 0px' });
+            }, { root: container, rootMargin: '500px 500px' }); // زيادة مساحة التتبع لضمان سلاسة السحب في كل الاتجاهات
 
             for (let index = 0; index < pageOrder.length; index++) {
                 const actualPageNum = pageOrder[index];
@@ -1280,7 +1332,7 @@
                 bookmarkBadge.className = 'page-bookmark-badge';
                 bookmarkBadge.innerHTML = '🔖';
                 bookmarkBadge.onclick = () => {
-                    goToPage(displayIndex);
+                    if (typeof goToPage === 'function') goToPage(displayIndex);
                     toggleSidebar(true);
                 };
                 pageWrapper.appendChild(bookmarkBadge);
@@ -1288,13 +1340,13 @@
                 container.appendChild(pageWrapper);
                 pageObserver.observe(pageWrapper);
 
-                renderThumbnailSkeleton(displayIndex, actualPageNum);
+                if (typeof renderThumbnailSkeleton === 'function') renderThumbnailSkeleton(displayIndex, actualPageNum);
                 updatePageBookmarkUI(displayIndex);
             }
 
             applyViewModeUI();
-            reorderDOMPages();
-            goToPage(currentPage);
+            if (typeof reorderDOMPages === 'function') reorderDOMPages();
+            if (typeof goToPage === 'function') goToPage(currentPage);
         }
 
         async function renderPageContent(pageWrapper, actualPageNum, displayIndex) {
@@ -1350,15 +1402,17 @@
                 });
             });
 
-            restorePageDrawings(actualPageNum, drawCanvas);
-            restorePageTexts(actualPageNum, pageWrapper);
-            restorePageImages(actualPageNum, pageWrapper);
-            initDrawingEvents(drawCanvas, displayIndex, actualPageNum);
-            updateCanvasPointerEvents();
+            if (typeof restorePageDrawings === 'function') restorePageDrawings(actualPageNum, drawCanvas);
+            if (typeof restorePageTexts === 'function') restorePageTexts(actualPageNum, pageWrapper);
+            if (typeof restorePageImages === 'function') restorePageImages(actualPageNum, pageWrapper);
+            if (typeof initDrawingEvents === 'function') initDrawingEvents(drawCanvas, displayIndex, actualPageNum);
+            if (typeof updateCanvasPointerEvents === 'function') updateCanvasPointerEvents();
         }
 
-        function renderThumbnailSkeleton(displayIndex, actualPageNum) {
+function renderThumbnailSkeleton(displayIndex, actualPageNum) {
             const thumbsContainer = document.getElementById('thumbnailsContainer');
+            if (!thumbsContainer) return;
+
             const thumbItem = document.createElement('div');
             thumbItem.className = `thumb-item ${displayIndex === currentPage ? 'active' : ''}`;
             thumbItem.dataset.pageNum = displayIndex;
@@ -1371,7 +1425,7 @@
             deleteBadge.onclick = (e) => {
                 e.stopPropagation();
                 const pIndex = parseInt(thumbItem.dataset.pageNum);
-                confirmDeletePage(pIndex);
+                if (typeof confirmDeletePage === 'function') confirmDeletePage(pIndex);
             };
 
             const pageNumBadge = document.createElement('div');
@@ -1405,6 +1459,7 @@
                 entries.forEach(async entry => {
                     if (entry.isIntersecting) {
                         obs.disconnect();
+                        if (!pdfDoc) return;
                         const page = await pdfDoc.getPage(actualPageNum);
                         const thumbCanvas = document.createElement('canvas');
                         const thumbViewport = page.getViewport({ scale: 0.12 });
@@ -1422,6 +1477,7 @@
         function toggleEditMode(enable) {
             isEditMode = enable;
             const container = document.getElementById('thumbnailsContainer');
+            if (!container) return;
             if (enable) {
                 container.classList.add('edit-mode');
             } else {
@@ -1453,14 +1509,16 @@
             pageOrder = newOrder;
 
             const container = document.getElementById('viewer-container');
-            pageOrder.forEach((actualPage, idx) => {
-                const newDisplayIndex = idx + 1;
-                const wrapper = container.querySelector(`.page-wrapper[data-actual-page="${actualPage}"]`);
-                if (wrapper) {
-                    wrapper.dataset.pageNum = newDisplayIndex;
-                    updatePageBookmarkUI(newDisplayIndex);
-                }
-            });
+            if (container) {
+                pageOrder.forEach((actualPage, idx) => {
+                    const newDisplayIndex = idx + 1;
+                    const wrapper = container.querySelector(`.page-wrapper[data-actual-page="${actualPage}"]`);
+                    if (wrapper) {
+                        wrapper.dataset.pageNum = newDisplayIndex;
+                        if (typeof updatePageBookmarkUI === 'function') updatePageBookmarkUI(newDisplayIndex);
+                    }
+                });
+            }
 
             reorderDOMPages();
             savePageOrder();
@@ -1469,6 +1527,7 @@
 
         function reorderDOMPages() {
             const container = document.getElementById('viewer-container');
+            if (!container) return;
             pageOrder.forEach(actualPage => {
                 const wrapper = container.querySelector(`.page-wrapper[data-actual-page="${actualPage}"]`);
                 if (wrapper) {
@@ -1491,6 +1550,7 @@
             thumb.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 const container = document.getElementById('thumbnailsContainer');
+                if (!container) return;
                 const dragging = container.querySelector('.dragging');
                 if (!dragging) return;
                 const siblings = [...container.querySelectorAll('.thumb-item:not(.dragging)')];
@@ -1510,8 +1570,9 @@
         }
 
         async function savePageOrder() {
-            updateAutosaveIndicator('saving');
+            if (typeof updateAutosaveIndicator === 'function') updateAutosaveIndicator('saving');
             return new Promise((resolve) => {
+                if (!db || !currentFileId) return resolve();
                 const tx = db.transaction("files", "readwrite");
                 const store = tx.objectStore("files");
                 store.get(currentFileId).onsuccess = e => {
@@ -1519,9 +1580,11 @@
                     if (data) {
                         data.pageOrder = [...pageOrder];
                         store.put(data).onsuccess = () => {
-                            updateAutosaveIndicator('saved');
+                            if (typeof updateAutosaveIndicator === 'function') updateAutosaveIndicator('saved');
                             resolve();
                         };
+                    } else {
+                        resolve();
                     }
                 };
             });
@@ -1529,7 +1592,7 @@
 
         function goToPage(pageNum) {
             if (!pdfDoc || pageNum < 1 || pageNum > pageOrder.length) return;
-            savePageData(currentPage);
+            if (typeof savePageData === 'function') savePageData(currentPage);
             currentPage = pageNum;
             
             const targetWrapper = document.querySelector(`.page-wrapper[data-page-num="${pageNum}"]`);
@@ -1583,71 +1646,122 @@
         const viewer = document.getElementById('viewer-container');
         const editorScreen = document.getElementById('editor-screen');
 
-        const startTouch = () => { if (currentTool) editorScreen.classList.add('is-touching'); };
-        const endTouch = () => editorScreen.classList.remove('is-touching');
+        const startTouch = () => { if (currentTool && editorScreen) editorScreen.classList.add('is-touching'); };
+        const endTouch = () => { if (editorScreen) editorScreen.classList.remove('is-touching'); };
 
-        viewer.addEventListener('pointerdown', startTouch);
-        viewer.addEventListener('pointerup', endTouch);
-        viewer.addEventListener('pointercancel', endTouch);
+        if (viewer) {
+            viewer.addEventListener('pointerdown', startTouch);
+            viewer.addEventListener('pointerup', endTouch);
+            viewer.addEventListener('pointercancel', endTouch);
 
-        viewer.addEventListener('touchstart', e => {
-            if (e.touches.length === 2) {
-                initialDistance = Math.hypot(
-                    e.touches[0].clientX - e.touches[1].clientX,
-                    e.touches[0].clientY - e.touches[1].clientY
-                );
+            viewer.addEventListener('touchstart', e => {
+                if (e.touches.length === 2) {
+                    initialDistance = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+
+                    const rect = viewer.getBoundingClientRect();
+                    pinchCenter = {
+                        x: (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left + viewer.scrollLeft,
+                        y: (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top + viewer.scrollTop
+                    };
+                }
+            }, { passive: true });
+
+            viewer.addEventListener('touchmove', e => {
+                if (e.touches.length === 2 && initialDistance) {
+                    e.preventDefault();
+
+                    const currentDistance = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+                    
+                    const factor = currentDistance / initialDistance;
+                    const prevScale = zoomScale;
+                    const newScale = Math.max(0.6, Math.min(4.0, prevScale * factor));
+                    
+                    if (newScale !== prevScale) {
+                        const scaleRatio = newScale / prevScale;
+                        zoomScale = newScale;
+
+                        requestAnimationFrame(() => {
+                            applyZoomTransform();
+                            viewer.scrollLeft = pinchCenter.x * scaleRatio - (pinchCenter.x - viewer.scrollLeft);
+                            viewer.scrollTop = pinchCenter.y * scaleRatio - (pinchCenter.y - viewer.scrollTop);
+                        });
+                    }
+
+                    initialDistance = currentDistance;
+                }
+            }, { passive: false });
+
+            viewer.addEventListener('touchend', e => {
+                if (e.touches.length < 2) initialDistance = null;
+                if (e.touches.length === 0) endTouch();
+            }, { passive: true });
+        }
+
+        /*
+         * تغيير الحجم الحقيقي للصفحة بدل transform فقط.
+         * هذا يجعل overflow يحسب العرض والارتفاع بعد الزوم فعلياً،
+         * وبالتالي يمكن التحرك يمين/شمال وفوق/تحت بحرية.
+         */
+        /*
+         * على الكمبيوتر:
+         * Ctrl + Wheel أو Cmd + Wheel = Zoom حول مكان المؤشر.
+         * Wheel العادي يظل Scroll طبيعي في كل الاتجاهات.
+         */
+        if (viewer) {
+            viewer.addEventListener('wheel', e => {
+                if (!(e.ctrlKey || e.metaKey) || !pdfDoc) return;
+
+                e.preventDefault();
 
                 const rect = viewer.getBoundingClientRect();
-                pinchCenter = {
-                    x: (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left + viewer.scrollLeft,
-                    y: (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top + viewer.scrollTop
-                };
-            }
-        }, { passive: true });
+                const cursorX = e.clientX - rect.left + viewer.scrollLeft;
+                const cursorY = e.clientY - rect.top + viewer.scrollTop;
 
-        viewer.addEventListener('touchmove', e => {
-            if (e.touches.length === 2 && initialDistance) {
-                const currentDistance = Math.hypot(
-                    e.touches[0].clientX - e.touches[1].clientX,
-                    e.touches[0].clientY - e.touches[1].clientY
-                );
-                
-                const factor = currentDistance / initialDistance;
-                const prevScale = zoomScale;
-                const newScale = Math.max(0.6, Math.min(4.0, prevScale * factor));
-                
-                if (newScale !== prevScale) {
-                    const scaleRatio = newScale / prevScale;
-                    zoomScale = newScale;
+                const oldScale = zoomScale;
+                const factor = Math.exp(-e.deltaY * 0.0025);
+                const newScale = Math.max(0.6, Math.min(4.0, oldScale * factor));
 
-                    requestAnimationFrame(() => {
-                        applyZoomTransform();
-                        viewer.scrollLeft = pinchCenter.x * scaleRatio - (pinchCenter.x - viewer.scrollLeft);
-                        viewer.scrollTop = pinchCenter.y * scaleRatio - (pinchCenter.y - viewer.scrollTop);
-                    });
-                }
+                if (newScale === oldScale) return;
 
-                initialDistance = currentDistance;
-            }
-        }, { passive: true });
+                zoomScale = newScale;
+                applyZoomTransform();
+
+                const ratio = newScale / oldScale;
+
+                requestAnimationFrame(() => {
+                    viewer.scrollLeft = Math.max(
+                        0,
+                        cursorX * ratio - (e.clientX - rect.left)
+                    );
+                    viewer.scrollTop = Math.max(
+                        0,
+                        cursorY * ratio - (e.clientY - rect.top)
+                    );
+                });
+            }, { passive: false });
+        }
 
         function applyZoomTransform() {
             document.querySelectorAll('.page-wrapper').forEach(w => {
                 const baseW = parseFloat(w.dataset.baseWidth) || 600;
                 const baseH = parseFloat(w.dataset.baseHeight) || 800;
+
                 w.style.width = (baseW * zoomScale) + 'px';
                 w.style.height = (baseH * zoomScale) + 'px';
+                w.style.flex = '0 0 auto';
             });
         }
 
-        viewer.addEventListener('touchend', e => {
-            if (e.touches.length < 2) initialDistance = null;
-            if (e.touches.length === 0) endTouch();
-        }, { passive: true });
-
         function toggleTool(toolName) {
-            document.getElementById('background-panel').style.display = 'none';
-            document.getElementById('bgToggleBtn').classList.remove('active');
+            const bgPanel = document.getElementById('background-panel');
+            if (bgPanel) bgPanel.style.display = 'none';
+            document.getElementById('bgToggleBtn')?.classList.remove('active');
 
             if (currentTool === toolName) {
                 currentTool = null;
@@ -1664,9 +1778,9 @@
             document.querySelectorAll('#toolbar button').forEach(b => {
                 if (b.id !== 'viewModeToggleBtn' && b.id !== 'undoBtn' && b.id !== 'bgToggleBtn' && b.id !== 'bookmarkToggleBtn') b.classList.remove('active');
             });
-            if (currentTool === 'pen') document.getElementById('penBtn').classList.add('active');
-            if (currentTool === 'text') document.getElementById('textBtn').classList.add('active');
-            if (currentTool === 'eraser') document.getElementById('eraserBtn').classList.add('active');
+            if (currentTool === 'pen') document.getElementById('penBtn')?.classList.add('active');
+            if (currentTool === 'text') document.getElementById('textBtn')?.classList.add('active');
+            if (currentTool === 'eraser') document.getElementById('eraserBtn')?.classList.add('active');
         }
 
         function updateCanvasPointerEvents() {
@@ -1681,33 +1795,37 @@
             const badge = document.getElementById('sizeValBadge');
             const label = document.getElementById('sizeSliderLabel');
 
+            if (!panel || !slider) return;
+
             panel.style.display = 'flex';
             if (toolName === 'text') {
-                label.innerText = 'Font Size:';
+                if (label) label.innerText = 'Font Size:';
                 slider.min = "10";
                 slider.max = "80";
             } else {
-                label.innerText = 'Size:';
+                if (label) label.innerText = 'Size:';
                 slider.min = "1";
                 slider.max = "100";
             }
 
             const val = toolSizes[toolName] || (toolName === 'text' ? 18 : 5);
             slider.value = val;
-            badge.innerText = val;
+            if (badge) badge.innerText = val;
         }
 
         function hideSizeSlider() {
-            document.getElementById('size-slider-panel').style.display = 'none';
+            const panel = document.getElementById('size-slider-panel');
+            if (panel) panel.style.display = 'none';
         }
 
         function updateToolSize(val) {
-            document.getElementById('sizeValBadge').innerText = val;
+            const badge = document.getElementById('sizeValBadge');
+            if (badge) badge.innerText = val;
             if (currentTool) {
                 toolSizes[currentTool] = parseInt(val);
                 if (currentTool === 'text' && activeTextNode) {
                     activeTextNode.style.fontSize = val + 'px';
-                    savePageData(currentPage);
+                    if (typeof savePageData === 'function') savePageData(currentPage);
                 }
             }
         }
@@ -1733,14 +1851,16 @@
                 if (currentTool === 'text') {
                     const rect = canvas.parentElement.getBoundingClientRect();
                     const fontSize = toolSizes['text'] || 18;
-                    const baseW = parseFloat(canvas.parentElement.dataset.baseWidth);
-                    const baseH = parseFloat(canvas.parentElement.dataset.baseHeight);
+                    const baseW = parseFloat(canvas.parentElement.dataset.baseWidth) || 600;
+                    const baseH = parseFloat(canvas.parentElement.dataset.baseHeight) || 800;
                     
                     const clickX = ((e.clientX - rect.left) / rect.width) * baseW;
                     const clickY = ((e.clientY - rect.top) / rect.height) * baseH;
                     
-                    createTextNode(clickX, clickY, "Type here...", activeColor, canvas.parentElement, displayIndex, fontSize);
-                    savePageData(displayIndex);
+                    if (typeof createTextNode === 'function') {
+                        createTextNode(clickX, clickY, "Type here...", activeColor, canvas.parentElement, displayIndex, fontSize);
+                        if (typeof savePageData === 'function') savePageData(displayIndex);
+                    }
                     return;
                 }
                 
@@ -1761,12 +1881,14 @@
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
 
-                    const displaySize = toolSizes['eraser'] * zoomScale;
-                    eraserCursor.style.width = displaySize + 'px';
-                    eraserCursor.style.height = displaySize + 'px';
-                    eraserCursor.style.left = e.clientX + 'px';
-                    eraserCursor.style.top = e.clientY + 'px';
-                    eraserCursor.style.display = 'block';
+                    if (eraserCursor) {
+                        const displaySize = toolSizes['eraser'] * zoomScale;
+                        eraserCursor.style.width = displaySize + 'px';
+                        eraserCursor.style.height = displaySize + 'px';
+                        eraserCursor.style.left = e.clientX + 'px';
+                        eraserCursor.style.top = e.clientY + 'px';
+                        eraserCursor.style.display = 'block';
+                    }
                 } else {
                     ctx.globalCompositeOperation = 'source-over';
                     ctx.strokeStyle = activeColor;
@@ -1782,7 +1904,7 @@
             };
 
             canvas.onpointermove = e => {
-                if (currentTool === 'eraser' && isDrawing) {
+                if (currentTool === 'eraser' && isDrawing && eraserCursor) {
                     eraserCursor.style.left = e.clientX + 'px';
                     eraserCursor.style.top = e.clientY + 'px';
                 }
@@ -1824,17 +1946,17 @@
 
             canvas.onpointerup = () => {
                 endTouch();
-                eraserCursor.style.display = 'none';
+                if (eraserCursor) eraserCursor.style.display = 'none';
                 if (isDrawing) {
                     isDrawing = false;
                     strokePoints = [];
-                    savePageData(displayIndex);
+                    if (typeof savePageData === 'function') savePageData(displayIndex);
                 }
             };
 
             canvas.onpointercancel = () => {
                 endTouch();
-                eraserCursor.style.display = 'none';
+                if (eraserCursor) eraserCursor.style.display = 'none';
                 isDrawing = false;
                 strokePoints = [];
             };
@@ -1853,7 +1975,7 @@
                 img.onload = () => {
                     drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
                     drawCtx.drawImage(img, 0, 0);
-                    savePageData(pageNum);
+                    if (typeof savePageData === 'function') savePageData(pageNum);
                 };
                 img.src = dataUrl;
             }
@@ -1874,31 +1996,35 @@
                         const textsOnPage = [];
                         wrapper.querySelectorAll('.text-node-wrapper').forEach(wrapperNode => {
                             const node = wrapperNode.querySelector('.text-node');
-                            textsOnPage.push({
-                                text: node.innerText,
-                                x: parseFloat(wrapperNode.dataset.baseX) || 0,
-                                y: parseFloat(wrapperNode.dataset.baseY) || 0,
-                                color: node.style.color,
-                                fontSize: parseFloat(node.style.fontSize) || 18
-                            });
+                            if (node) {
+                                textsOnPage.push({
+                                    text: node.innerText,
+                                    x: parseFloat(wrapperNode.dataset.baseX) || 0,
+                                    y: parseFloat(wrapperNode.dataset.baseY) || 0,
+                                    color: node.style.color || activeColor,
+                                    fontSize: parseFloat(node.style.fontSize) || 18
+                                });
+                            }
                         });
                         currentTexts[actualPage] = textsOnPage;
 
                         const imagesOnPage = [];
                         wrapper.querySelectorAll('.img-node').forEach(node => {
                             const img = node.querySelector('img');
-                            imagesOnPage.push({
-                                src: img.src,
-                                x: parseFloat(node.dataset.baseX) || 0,
-                                y: parseFloat(node.dataset.baseY) || 0,
-                                w: parseFloat(node.style.width),
-                                h: parseFloat(node.style.height)
-                            });
+                            if (img) {
+                                imagesOnPage.push({
+                                    src: img.src,
+                                    x: parseFloat(node.dataset.baseX) || 0,
+                                    y: parseFloat(node.dataset.baseY) || 0,
+                                    w: parseFloat(node.style.width) || 150,
+                                    h: parseFloat(node.style.height) || 150
+                                });
+                            }
                         });
                         currentImages[actualPage] = imagesOnPage;
                     }
 
-                    if (!currentFileId) { resolve(); return; }
+                    if (!currentFileId || !db) { resolve(); return; }
 
                     const tx = db.transaction("files", "readwrite");
                     const store = tx.objectStore("files");
@@ -1927,11 +2053,11 @@
         }
 
         function savePageData(displayIndex) {
-            updateAutosaveIndicator('saving');
+            if (typeof updateAutosaveIndicator === 'function') updateAutosaveIndicator('saving');
             clearTimeout(saveTimeout);
             saveTimeout = setTimeout(() => {
                 savePageDataNow(displayIndex).then(() => {
-                    updateAutosaveIndicator('saved');
+                    if (typeof updateAutosaveIndicator === 'function') updateAutosaveIndicator('saved');
                 }).catch(err => console.error("Autosave Error:", err));
             }, 300);
         }
@@ -1993,18 +2119,23 @@
                 e.stopPropagation();
                 wrapperNode.remove();
                 savePageData(displayIndex);
-                showUndoToast("Text deleted", () => {
-                    createTextNode(x, y, text, color, parentWrapper, displayIndex, fontSize);
-                    savePageData(displayIndex);
-                });
+                if (typeof showUndoToast === 'function') {
+                    showUndoToast("Text deleted", () => {
+                        createTextNode(x, y, text, color, parentWrapper, displayIndex, fontSize);
+                        savePageData(displayIndex);
+                    });
+                }
             };
 
             node.onfocus = () => {
                 activeTextNode = node;
                 if (currentTool === 'text') {
                     showSizeSlider('text');
-                    document.getElementById('toolSizeSlider').value = parseFloat(node.style.fontSize) || 18;
-                    document.getElementById('sizeValBadge').innerText = parseFloat(node.style.fontSize) || 18;
+                    const currentSz = parseFloat(node.style.fontSize) || 18;
+                    const slider = document.getElementById('toolSizeSlider');
+                    const badge = document.getElementById('sizeValBadge');
+                    if (slider) slider.value = currentSz;
+                    if (badge) badge.innerText = currentSz;
                 }
             };
 
@@ -2107,10 +2238,12 @@
             delBtn.onclick = () => { 
                 node.remove(); 
                 savePageData(displayIndex); 
-                showUndoToast("Image deleted", () => {
-                    createImageNode(x, y, src, w, h, parentWrapper, displayIndex);
-                    savePageData(displayIndex);
-                });
+                if (typeof showUndoToast === 'function') {
+                    showUndoToast("Image deleted", () => {
+                        createImageNode(x, y, src, w, h, parentWrapper, displayIndex);
+                        savePageData(displayIndex);
+                    });
+                }
             };
 
             const resizeHandle = document.createElement('div');
@@ -2124,8 +2257,8 @@
                 let startHeight = node.offsetHeight;
 
                 const onPointerMove = moveEvent => {
-                    let newWidth = Math.max(50, startWidth + (moveEvent.clientX - startX));
-                    let newHeight = Math.max(50, startHeight + (moveEvent.clientY - startY));
+                    let newWidth = Math.max(50, startWidth + (moveEvent.clientX - startX) / zoomScale);
+                    let newHeight = Math.max(50, startHeight + (moveEvent.clientY - startY) / zoomScale);
                     node.style.width = newWidth + 'px';
                     node.style.height = newHeight + 'px';
                 };
@@ -2185,15 +2318,32 @@
             parentWrapper.appendChild(node);
         }
 
+        // تحويل ألوان Hex/RGB إلى RGB متوافق مع PDFLib
+        function parseColorToPdfRgb(colorStr) {
+            if (!colorStr) return PDFLib.rgb(0, 0, 0);
+            if (colorStr.startsWith('#')) {
+                let hex = colorStr.replace('#', '');
+                if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+                const intVal = parseInt(hex, 16);
+                return PDFLib.rgb(((intVal >> 16) & 255) / 255, ((intVal >> 8) & 255) / 255, (intVal & 255) / 255);
+            }
+            const match = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+            if (match) {
+                return PDFLib.rgb(parseInt(match[1]) / 255, parseInt(match[2]) / 255, parseInt(match[3]) / 255);
+            }
+            return PDFLib.rgb(0, 0, 0);
+        }
+
         async function exportFullPDF() {
-            if (!pdfDoc) return;
+            if (!pdfDoc || !window.PDFLib) return;
             await savePageDataNow(currentPage);
 
             const tx = db.transaction("files", "readonly");
             tx.objectStore("files").get(currentFileId).onsuccess = async e => {
                 const record = e.target.result;
-                const pdfLibDoc = await PDFLib.PDFDocument.load(record.data);
+                if (!record || !record.data) return;
 
+                const pdfLibDoc = await PDFLib.PDFDocument.load(record.data);
                 const newDoc = await PDFLib.PDFDocument.create();
 
                 for (let i = 0; i < pageOrder.length; i++) {
@@ -2202,22 +2352,48 @@
                     const page = newDoc.addPage(copiedPage);
                     const { width, height } = page.getSize();
 
+                    // 1. تصدير الرسومات
                     if (record.drawings && record.drawings[actualPageNum]) {
-                        const img = await newDoc.embedPng(record.drawings[actualPageNum]);
-                        page.drawImage(img, { x: 0, y: 0, width: width, height: height });
+                        try {
+                            const img = await newDoc.embedPng(record.drawings[actualPageNum]);
+                            page.drawImage(img, { x: 0, y: 0, width: width, height: height });
+                        } catch(err) { console.error("Error embedding drawings:", err); }
                     }
 
+                    // 2. تصدير الصور المضافة
+                    if (record.images && record.images[actualPageNum]) {
+                        for (const imgData of record.images[actualPageNum]) {
+                            try {
+                                let embeddedImg;
+                                if (imgData.src.startsWith('data:image/png')) {
+                                    embeddedImg = await newDoc.embedPng(imgData.src);
+                                } else {
+                                    embeddedImg = await newDoc.embedJpg(imgData.src);
+                                }
+                                const pdfY = height - imgData.y - imgData.h;
+                                page.drawImage(embeddedImg, {
+                                    x: imgData.x,
+                                    y: pdfY,
+                                    width: imgData.w,
+                                    height: imgData.h
+                                });
+                            } catch(err) { console.error("Error embedding image node:", err); }
+                        }
+                    }
+
+                    // 3. تصدير النصوص
                     if (record.texts && record.texts[actualPageNum]) {
                         record.texts[actualPageNum].forEach(t => {
+                            if (!t.text) return;
                             const pdfY = height - t.y - (t.fontSize || 18);
                             try {
                                 page.drawText(t.text, {
                                     x: t.x,
                                     y: pdfY > 0 ? pdfY : t.y,
                                     size: t.fontSize || 18,
-                                    color: PDFLib.rgb(0, 0, 0)
+                                    color: parseColorToPdfRgb(t.color)
                                 });
-                            } catch(err) {}
+                            } catch(err) { console.error("Error drawing text node:", err); }
                         });
                     }
                 }
