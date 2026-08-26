@@ -1,17 +1,12 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
+<html lang="ar" dir="ltr">
 <head>
     <link rel="manifest" href="./manifest.json">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="./manifest.json">
-    <meta name="theme-color" content="#000000">
-    <!-- إضافة الأيقونة بجانب اسم الموقع في الـ Tab -->
+    <meta name="theme-color" content="#ffffff">
     <link rel="icon" type="image/png" href="./icon-192.png">
 
-    <!-- PWA Manifest -->
-    <meta name="theme-color" content="#000000">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <title>Zaker by Yahya Atwa</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
@@ -27,14 +22,14 @@
         }
         
         body { 
-            background: #000;
-            color: #f5f5f7; 
+            background: #eef2f5;
+            color: #1c1c1e; 
             height: 100vh; 
             height: 100dvh; 
             display: flex; 
             flex-direction: column; 
             overflow: hidden; 
-            touch-action: auto;
+            touch-action: manipulation;
         }
 
         .glass-bg {
@@ -43,39 +38,74 @@
             left: 0; 
             width: 100%; 
             height: 100%;
-            background: radial-gradient(circle at 50% 0%, #2c1654 0%, #0d0d12 70%);
+            background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.98) 0%, rgba(225, 232, 245, 0.85) 50%, rgba(200, 212, 230, 0.9) 100%);
+            filter: blur(20px);
             z-index: -1;
         }
 
         .apple-glass {
-            background: rgba(255, 255, 255, 0.12) !important;
-            backdrop-filter: blur(15px) saturate(180%) brightness(110%);
-            -webkit-backdrop-filter: blur(15px) saturate(180%) brightness(110%);
-            border: 1px solid rgba(255, 255, 255, 0.22) !important;
-            box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.4), 
-                        inset 0 1px 0 0 rgba(255, 255, 255, 0.3);
-            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+            background: rgba(255, 255, 255, 0.45) !important;
+            backdrop-filter: blur(35px) saturate(220%) contrast(90%);
+            -webkit-backdrop-filter: blur(35px) saturate(220%) contrast(90%);
+            border: 1px solid rgba(255, 255, 255, 0.75) !important;
+            box-shadow: 
+                0 16px 40px 0 rgba(31, 38, 135, 0.08),
+                inset 0 1px 2px 0 rgba(255, 255, 255, 0.9),
+                inset 0 -1px 1px 0 rgba(0, 0, 0, 0.03);
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease, background 0.3s;
+        }
+
+        #status-bar {
+            position: fixed;
+            top: 8px;
+            right: 15px;
+            z-index: 1005;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 11px;
+            font-weight: 600;
+            color: #1c1c1e;
+            padding: 4px 12px;
+            border-radius: 16px;
+            pointer-events: none;
+            letter-spacing: -0.2px;
+        }
+
+        #eraser-cursor {
+            position: fixed;
+            pointer-events: none;
+            border: 1.5px solid rgba(0, 0, 0, 0.5);
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 9999;
+            display: none;
+            box-shadow: 0 0 12px rgba(0,0,0,0.1);
+            backdrop-filter: blur(3px);
+            -webkit-backdrop-filter: blur(3px);
         }
 
         #home-screen { padding: 25px; display: flex; flex-direction: column; height: 100%; max-width: 900px; margin: 0 auto; width: 100%; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .header h2 { font-weight: 600; font-size: 22px; letter-spacing: -0.5px; }
+        .header h2 { font-weight: 600; font-size: 22px; letter-spacing: -0.5px; color: #1c1c1e; }
 
         .btn-apple { 
-            background: rgba(255, 255, 255, 0.12); color: #fff; border: 0.5px solid rgba(255, 255, 255, 0.2); 
-            padding: 8px 16px; border-radius: 20px; font-weight: 500; cursor: pointer; font-size: 13px;
-            backdrop-filter: blur(15px); transition: all 0.2s ease; display: flex; align-items: center; gap: 6px;
+            background: rgba(255, 255, 255, 0.75); color: #1c1c1e; border: 0.5px solid rgba(0, 0, 0, 0.12); 
+            padding: 8px 16px; border-radius: 20px; font-weight: 600; cursor: pointer; font-size: 13px;
+            backdrop-filter: blur(15px); transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); display: flex; align-items: center; gap: 6px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.04);
         }
-        .btn-apple:active { transform: scale(0.96); background: rgba(255, 255, 255, 0.25); }
+        .btn-apple:active { transform: scale(0.95); background: rgba(255, 255, 255, 0.9); }
 
         .notes-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 15px; overflow-y: auto; flex: 1; padding: 5px; will-change: transform; }
         .note-card { border-radius: 18px; padding: 15px; cursor: pointer; display: flex; flex-direction: column; align-items: center; position: relative; transition: all 0.2s ease; will-change: transform; }
         .note-card:active { transform: scale(0.96); }
-        .pdf-icon { font-size: 40px; margin: 10px 0; opacity: 0.9; }
-        .note-title { font-weight: 500; font-size: 12px; text-align: center; color: #e5e5ea; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .delete-btn { position: absolute; top: 8px; right: 8px; background: rgba(255, 59, 48, 0.6); color: white; border: none; border-radius: 50%; width: 22px; height: 22px; font-weight: bold; cursor: pointer; font-size: 11px; }
+        .pdf-icon { font-size: 40px; margin: 10px 0; opacity: 0.9; color: #1c1c1e; }
+        .note-title { font-weight: 500; font-size: 12px; text-align: center; color: #1c1c1e; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .delete-btn { position: absolute; top: 8px; right: 8px; background: rgba(255, 59, 48, 0.85); color: white; border: none; border-radius: 50%; width: 22px; height: 22px; font-weight: bold; cursor: pointer; font-size: 11px; }
 
-        #editor-screen { display: none; flex-direction: column; height: 100vh; height: 100dvh; position: relative; width: 100vw; overflow: hidden; }
+        #editor-screen { display: none; flex-direction: column; height: 100vh; height: 100dvh; position: relative; width: 100vw; overflow: hidden; background: #eef2f5; }
         
         .glass-bar-width {
             width: 92vw;
@@ -83,8 +113,17 @@
         }
 
         #toolbar-container {
-            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
-            z-index: 100; display: flex; flex-direction: column; align-items: center; gap: 8px;
+            position: fixed; 
+            top: 28px; 
+            left: 50%; 
+            transform: translateX(-50%);
+            z-index: 1000; 
+            display: flex; 
+            flex-direction: column; 
+            align-items: center; 
+            gap: 8px;
+            pointer-events: auto;
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
         }
         
         #toolbar { 
@@ -94,29 +133,37 @@
         #toolbar::-webkit-scrollbar { display: none; }
         
         #toolbar button { 
-            padding: 6px 10px; border-radius: 20px; border: 0.5px solid rgba(255, 255, 255, 0.15); 
-            background: rgba(255, 255, 255, 0.08); color: #f2f2f7; cursor: pointer; font-size: 13px; transition: all 0.2s;
+            padding: 6px 10px; border-radius: 20px; border: 0.5px solid rgba(0, 0, 0, 0.08); 
+            background: rgba(0, 0, 0, 0.04); color: #1c1c1e; cursor: pointer; font-size: 13px; transition: all 0.2s;
             display: flex; align-items: center; gap: 4px; flex-shrink: 0;
+            font-weight: 500;
+        }
+        #toolbar button svg {
+            fill: #1c1c1e;
+            width: 16px;
+            height: 16px;
         }
         #toolbar button:active { transform: scale(0.95); }
-        #toolbar button.active { background: rgba(255, 255, 255, 0.28); font-weight: 600; border-color: rgba(255,255,255,0.4); box-shadow: inset 0 0 8px rgba(255, 255, 255, 0.2); }
+        #toolbar button.active { background: #1c1c1e; color: #ffffff; border-color: #1c1c1e; }
+        #toolbar button.active svg { fill: #ffffff; }
         
         .btn-view-mode {
-            background: rgba(0, 122, 255, 0.25) !important;
-            border: 0.5px solid rgba(0, 122, 255, 0.5) !important;
-            font-weight: 500;
+            background: rgba(0, 0, 0, 0.05) !important;
+            border: 0.5px solid rgba(0, 0, 0, 0.12) !important;
+            color: #1c1c1e !important;
         }
 
         #autosave-indicator {
             font-size: 11px;
             padding: 2px 10px;
             border-radius: 10px;
-            background: rgba(0, 0, 0, 0.3);
-            color: #30d158;
+            background: rgba(0, 0, 0, 0.04);
+            color: #34c759;
             margin-left: 5px;
             display: inline-flex;
             align-items: center;
             gap: 4px;
+            font-weight: 600;
         }
 
         #toast-container {
@@ -124,17 +171,17 @@
             bottom: 80px;
             left: 50%;
             transform: translateX(-50%) translateY(100px);
-            background: rgba(30, 30, 30, 0.85);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: #fff;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            color: #1c1c1e;
             padding: 10px 20px;
             border-radius: 25px;
-            z-index: 1000;
+            z-index: 2000;
             display: flex;
             align-items: center;
             gap: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.12);
             transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
             opacity: 0;
             pointer-events: none;
@@ -145,7 +192,7 @@
             pointer-events: auto;
         }
         #toast-container button {
-            background: #007aff;
+            background: #1c1c1e;
             color: white;
             border: none;
             padding: 4px 12px;
@@ -171,7 +218,7 @@
             width: 100%;
             height: 6px;
             border-radius: 3px;
-            background: rgba(255, 255, 255, 0.25);
+            background: rgba(0, 0, 0, 0.1);
             outline: none;
         }
 
@@ -181,18 +228,18 @@
             width: 18px;
             height: 18px;
             border-radius: 50%;
-            background: #ffffff;
-            box-shadow: 0 0 8px rgba(0, 0, 0, 0.4);
+            background: #1c1c1e;
+            box-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
             cursor: pointer;
-            border: 0.5px solid rgba(0,0,0,0.1);
+            border: 2px solid #ffffff;
         }
 
         .size-val-badge {
-            font-size: 12px; font-weight: bold; min-width: 28px; text-align: center; color: #fff;
+            font-size: 12px; font-weight: bold; min-width: 28px; text-align: center; color: #1c1c1e;
         }
 
-        .color-palette { display: flex; gap: 4px; align-items: center; background: rgba(0,0,0,0.25); padding: 3px 6px; border-radius: 20px; border: 0.5px solid rgba(255,255,255,0.1); flex-shrink: 0; }
-        .recent-color-swatch { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(255,255,255,0.4); }
+        .color-palette { display: flex; gap: 4px; align-items: center; background: rgba(0,0,0,0.04); padding: 3px 6px; border-radius: 20px; border: 0.5px solid rgba(0,0,0,0.08); flex-shrink: 0; }
+        .recent-color-swatch { width: 18px; height: 18px; border-radius: 50%; cursor: pointer; border: 1px solid rgba(0,0,0,0.15); }
 
         #background-panel {
             display: none;
@@ -209,14 +256,14 @@
             width: 32px;
             height: 32px;
             border-radius: 50%;
-            border: 2px solid #fff;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+            border: 2px solid #ccc;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
             cursor: pointer;
             background-color: #fff;
             transition: transform 0.2s, border-color 0.2s;
             flex-shrink: 0;
         }
-        .circle-btn:hover { transform: scale(1.15); border-color: #007bff; }
+        .circle-btn:hover { transform: scale(1.15); border-color: #1c1c1e; }
 
         .btn-lined {
             background-image: repeating-linear-gradient(transparent, transparent 5px, #a3a3a3 5px, #a3a3a3 6px);
@@ -242,20 +289,23 @@
                 linear-gradient(to bottom, #e5e7eb 1px, transparent 1px);
         }
 
+        /* تحسين التصفح والوصول لأي ركن بحرية تامة بغض النظر عن الزوم */
         #viewer-container { 
             flex: 1; width: 100%; height: 100%; 
             overflow: auto; 
-            display: flex; flex-direction: column; align-items: center;
-            padding: 120px 80vw 300px 80vw; 
-            touch-action: pan-x pan-y;
+            display: flex; 
+            align-items: center;
+            justify-content: center;
+            padding: 200px 50vw 200px 50vw; 
+            touch-action: pan-x pan-y pinch-zoom;
             -webkit-overflow-scrolling: touch;
-            will-change: transform;
+            will-change: scroll-position;
         }
 
         #viewer-container.horizontal .page-wrapper { display: none; }
         #viewer-container.horizontal .page-wrapper.active { display: block; animation: fadeIn 0.25s ease-in-out; }
 
-        #viewer-container.vertical { gap: 40px; justify-content: flex-start; }
+        #viewer-container.vertical { gap: 40px; flex-direction: column; justify-content: flex-start; }
         #viewer-container.vertical .page-wrapper { display: block; }
 
         @keyframes fadeIn {
@@ -264,8 +314,8 @@
         }
         
         .page-wrapper { 
-            position: relative; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); 
-            margin: 0 auto; flex-shrink: 0; will-change: transform; transition: background 0.3s ease;
+            position: relative; border-radius: 12px; box-shadow: 0 12px 35px rgba(0,0,0,0.12); 
+            margin: auto; flex-shrink: 0; transition: background 0.3s ease;
             min-height: 500px;
         }
         
@@ -282,52 +332,181 @@
             pointer-events: auto;
         }
         
-        .textLayer ::selection { background: rgba(0, 122, 255, 0.35); color: transparent; }
+        .textLayer ::selection { background: rgba(0, 0, 0, 0.15); color: transparent; }
         .textLayer span { color: transparent; cursor: text; position: absolute; white-space: pre; transform-origin: 0% 0%; }
 
+        /* البوكمارك الحمراء على الصفحة من فوق وتحتها ظل */
+        .page-bookmark-badge {
+            position: absolute;
+            top: -12px;
+            right: 30px;
+            width: 32px;
+            height: 42px;
+            background: linear-gradient(135deg, #ff3b30 0%, #d32f2f 100%);
+            border-radius: 0 0 6px 6px;
+            box-shadow: 0 6px 12px rgba(255, 59, 48, 0.4), 0 2px 4px rgba(0,0,0,0.2);
+            z-index: 15;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .page-bookmark-badge:hover {
+            transform: translateY(-2px);
+        }
+        .page-wrapper.bookmarked .page-bookmark-badge {
+            display: flex;
+        }
+
+        /* ستايل القائمة الجانبية للبوكماركس والفهرس */
+        #sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(4px);
+            z-index: 2000;
+            display: none;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        #sidebar-overlay.show {
+            display: block;
+            opacity: 1;
+        }
+
+        #sidebar {
+            position: fixed;
+            top: 0;
+            left: -320px;
+            width: 300px;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(30px);
+            z-index: 2001;
+            box-shadow: 5px 0 30px rgba(0,0,0,0.15);
+            transition: left 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            border-right: 1px solid rgba(255,255,255,0.8);
+        }
+        #sidebar.open {
+            left: 0;
+        }
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(0,0,0,0.1);
+        }
+        .sidebar-header h3 {
+            font-size: 16px;
+            font-weight: 600;
+            color: #1c1c1e;
+        }
+        .sidebar-close {
+            background: none;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: #1c1c1e;
+        }
+        .sidebar-content {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .bookmark-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            background: rgba(255, 255, 255, 0.6);
+            border: 0.5px solid rgba(0, 0, 0, 0.08);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .bookmark-item:hover {
+            background: rgba(255, 255, 255, 0.9);
+        }
+        .bookmark-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            flex: 1;
+        }
+        .bookmark-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: #1c1c1e;
+            outline: none;
+            border-bottom: 1px dashed transparent;
+        }
+        .bookmark-title:focus {
+            border-bottom-color: #007aff;
+        }
+        .bookmark-page {
+            font-size: 11px;
+            color: #8e8e93;
+        }
+        .bookmark-actions {
+            display: flex;
+            gap: 6px;
+        }
+        .bookmark-delete {
+            background: none;
+            border: none;
+            color: #ff3b30;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
         #bottom-thumbnails-bar {
-            position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%);
-            z-index: 100; display: flex; align-items: center; justify-content: space-between;
-            gap: 8px; padding: 8px 12px; border-radius: 24px;
+            position: fixed; 
+            bottom: 15px; 
+            left: 50%; 
+            transform: translateX(-50%);
+            z-index: 1000; 
+            display: flex; 
+            align-items: center; 
+            justify-content: space-between;
+            gap: 8px; 
+            padding: 8px 12px; 
+            border-radius: 24px;
+            pointer-events: auto;
+            transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
         }
-
-        .side-action-buttons {
-            position: absolute; top: 50%; right: 15px; transform: translateY(-50%);
-            z-index: 200; display: flex; flex-direction: column; gap: 10px;
-        }
-
-        .add-page-btn, .delete-page-btn {
-            background: rgba(255, 255, 255, 0.15);
-            backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.3); color: #fff;
-            border-radius: 50%; width: 44px; height: 44px; display: flex;
-            align-items: center; justify-content: center; font-size: 20px;
-            cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3); transition: all 0.2s ease;
-        }
-        .add-page-btn:active, .delete-page-btn:active { transform: scale(0.9); background: rgba(255, 255, 255, 0.3); }
-        .delete-page-btn { background: rgba(255, 59, 48, 0.25); border-color: rgba(255, 59, 48, 0.4); }
 
         .is-touching #bottom-thumbnails-bar {
-            transform: translateX(-50%) scale(0.7) translateY(20px) !important;
-            opacity: 0.25 !important; pointer-events: none;
+            transform: translateX(-50%) scale(0.8) translateY(15px) !important;
+            opacity: 0.3 !important; 
+            pointer-events: none;
         }
 
         .is-touching #toolbar-container {
-            transform: translateX(-50%) scale(0.85) translateY(-15px) !important;
-            opacity: 0.25 !important; pointer-events: none;
-        }
-        
-        .is-touching .side-action-buttons {
-            transform: translateY(-50%) scale(0.7) translateX(20px) !important;
-            opacity: 0.25 !important; pointer-events: none;
+            transform: translateX(-50%) scale(0.8) translateY(-15px) !important;
+            opacity: 0.3 !important; 
+            pointer-events: none;
         }
 
         .thumb-scroll-btn {
-            background: rgba(255, 255, 255, 0.15); border: 0.5px solid rgba(255, 255, 255, 0.25);
-            color: #fff; border-radius: 50%; width: 34px; height: 34px; display: flex;
-            align-items: center; justify-content: center; cursor: pointer; font-size: 14px; flex-shrink: 0; transition: all 0.2s;
+            background: rgba(0, 0, 0, 0.05); border: 0.5px solid rgba(0, 0, 0, 0.1);
+            color: #1c1c1e; border-radius: 50%; width: 34px; height: 34px; display: flex;
+            align-items: center; justify-content: center; cursor: pointer; font-size: 12px; flex-shrink: 0; transition: all 0.2s;
+            font-weight: bold;
         }
-        .thumb-scroll-btn:active { transform: scale(0.9); background: rgba(255, 255, 255, 0.3); }
+        .thumb-scroll-btn:active { transform: scale(0.9); background: rgba(0, 0, 0, 0.15); }
 
         .thumbnails-container {
             display: flex; gap: 10px; overflow-x: auto; scroll-behavior: smooth;
@@ -338,18 +517,18 @@
         .thumb-item {
             position: relative; flex-shrink: 0; cursor: pointer; border-radius: 8px;
             overflow: visible; border: 2px solid transparent; transition: all 0.2s ease;
-            background: rgba(255, 255, 255, 0.05); display: flex; flex-direction: column; align-items: center;
+            background: rgba(0, 0, 0, 0.03); display: flex; flex-direction: column; align-items: center;
             user-select: none; min-width: 45px; min-height: 60px;
         }
 
-        .thumb-item.active { border-color: #007aff; box-shadow: 0 0 12px rgba(0, 122, 255, 0.6); transform: scale(1.05); }
+        .thumb-item.active { border-color: #1c1c1e; box-shadow: 0 0 12px rgba(0, 0, 0, 0.2); transform: scale(1.05); }
         .thumb-item canvas { display: block; height: 60px; width: auto; border-radius: 6px; pointer-events: none; }
 
         .thumb-page-num {
-            position: absolute; bottom: 3px; right: 3px; background: rgba(0, 0, 0, 0.6);
+            position: absolute; bottom: 3px; right: 3px; background: rgba(255, 255, 255, 0.85);
             backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-            border: 0.5px solid rgba(255, 255, 255, 0.35); color: #ffffff; font-size: 10px;
-            padding: 2px 6px; border-radius: 8px; font-weight: 700; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+            border: 0.5px solid rgba(0, 0, 0, 0.15); color: #1c1c1e; font-size: 10px;
+            padding: 2px 6px; border-radius: 8px; font-weight: 700; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
             pointer-events: none;
         }
 
@@ -357,7 +536,7 @@
             display: none; position: absolute; top: -8px; left: -8px; background: #ff3b30;
             color: white; border: 1.5px solid #fff; border-radius: 50%; width: 22px; height: 22px;
             font-size: 12px; font-weight: bold; cursor: pointer; align-items: center; justify-content: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.5); z-index: 10;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 10;
         }
 
         .thumbnails-container.edit-mode .thumb-delete-badge { display: flex; }
@@ -371,33 +550,57 @@
 
         .text-node-wrapper { position: absolute; z-index: 10; display: inline-block; touch-action: none; user-select: none; }
         .text-node { background: transparent; border: 1px dashed transparent; padding: 4px 8px; cursor: move; min-width: 40px; outline: none; font-family: inherit; line-height: 1.3; word-break: break-word; user-select: text; }
-        .text-node-wrapper:focus-within .text-node { border-color: rgba(0, 122, 255, 0.5); cursor: text; }
-        .delete-text-badge { display: none; position: absolute; top: -10px; right: -10px; background: #ff3b30; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 11px; font-weight: bold; cursor: pointer; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.3); z-index: 11; }
+        .text-node-wrapper:focus-within .text-node { border-color: rgba(0, 0, 0, 0.3); cursor: text; }
+        .delete-text-badge { display: none; position: absolute; top: -10px; right: -10px; background: #ff3b30; color: white; border: none; border-radius: 50%; width: 20px; height: 20px; font-size: 11px; font-weight: bold; cursor: pointer; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,0.2); z-index: 11; }
         .text-node-wrapper:focus-within .delete-text-badge, .text-node-wrapper:hover .delete-text-badge { display: flex; }
 
-        .img-node { position: absolute; border: 1px dashed #007aff; cursor: move; user-select: none; z-index: 3; touch-action: none; }
+        .img-node { position: absolute; border: 1px dashed #1c1c1e; cursor: move; user-select: none; z-index: 3; touch-action: none; }
         .img-node img { width: 100%; height: 100%; pointer-events: none; display: block; }
         .img-node .delete-img { position: absolute; top: -8px; right: -8px; background: #ff3b30; color: white; border: none; border-radius: 50%; width: 18px; height: 18px; font-size: 10px; cursor: pointer; display: flex; align-items: center; justify-content: center; z-index: 5; }
-        .resize-handle { position: absolute; width: 12px; height: 12px; background: #007aff; border: 2px solid #fff; border-radius: 50%; bottom: -6px; right: -6px; cursor: se-resize; z-index: 5; }
+        .resize-handle { position: absolute; width: 12px; height: 12px; background: #1c1c1e; border: 2px solid #fff; border-radius: 50%; bottom: -6px; right: -6px; cursor: se-resize; z-index: 5; }
 
-        @media (orientation: landscape) { #toolbar-container { top: 10px; } #viewer-container { padding-top: 90px; } }
+        @media (orientation: landscape) { #toolbar-container { top: 18px; } #viewer-container { padding-top: 120px; } }
     </style>
 </head>
 <body>
 
     <div class="glass-bg"></div>
 
+    <!-- شريط حالة الجهاز العائم (الوقت بصيغة 12 ساعة مع الثواني والبطارية) -->
+    <div id="status-bar" class="apple-glass">
+        <span id="time-display">--:--:-- --</span>
+        <span style="opacity:0.3">|</span>
+        <span id="battery-display">🔋 --%</span>
+    </div>
+
+    <!-- دائرة معاينة حجم الاستيكة -->
+    <div id="eraser-cursor"></div>
+
     <div id="toast-container">
         <span id="toast-message">Deleted</span>
         <button onclick="executeUndoDelete()">Undo</button>
     </div>
 
+    <!-- قائمة البوكماركس وجدول المحتويات الجانبية -->
+    <div id="sidebar-overlay" onclick="toggleSidebar(false)"></div>
+    <div id="sidebar" class="apple-glass">
+        <div class="sidebar-header">
+            <h3>Bookmarks & Outline</h3>
+            <button class="sidebar-close" onclick="toggleSidebar(false)">✕</button>
+        </div>
+        <div class="sidebar-content" id="sidebarBookmarksList">
+            <!-- سيتم تعبئتها ديناميكياً -->
+        </div>
+    </div>
+
     <div id="home-screen">
         <div class="header">
-            <h2>Zaker by Yahya Atwa :</h2>
+            <h2>Zaker by Yahya Atwa</h2>
             <div>
                 <input type="file" id="pdfUploader" accept="application/pdf" style="display:none;">
-                <button class="btn-apple apple-glass" onclick="document.getElementById('pdfUploader').click()">＋ Open PDF</button>
+                <button class="btn-apple apple-glass" onclick="document.getElementById('pdfUploader').click()">
+                    <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Open PDF
+                </button>
             </div>
         </div>
         <div class="notes-grid" id="notesGrid"></div>
@@ -406,25 +609,63 @@
     <div id="editor-screen">
         <div id="toolbar-container" class="glass-bar-width">
             <div id="toolbar" class="apple-glass glass-bar-width">
-                <button onclick="goHome()" title="Home">🏠</button>
-                <button onclick="exportFullPDF()" style="color: #30d158; font-weight: 600;" title="Save & Export">💾</button>
+                <!-- Home -->
+                <button onclick="goHome()" title="Home">
+                    <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+                </button>
+                <!-- Bookmarks Menu Toggle -->
+                <button onclick="toggleSidebar(true)" title="Bookmarks & Outline">
+                    <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM11 7h2v2h-2zm0 4h2v2h-2zm0 4h2v2h-2z"/></svg>
+                </button>
+                <!-- Toggle Current Page Bookmark -->
+                <button id="bookmarkToggleBtn" onclick="toggleCurrentPageBookmark()" title="Bookmark Page">
+                    <svg viewBox="0 0 24 24"><path d="M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z"/></svg>
+                </button>
+                <!-- Export -->
+                <button onclick="exportFullPDF()" style="font-weight: 600;" title="Save & Export">
+                    <svg viewBox="0 0 24 24"><path d="M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z"/></svg>
+                </button>
                 
                 <span style="opacity:0.2">|</span>
 
-                <button id="fullscreenBtn" onclick="toggleFullScreen()" title="Fullscreen">⛶</button>
-                <button id="viewModeToggleBtn" class="btn-view-mode" onclick="toggleViewMode()">↔️ Horizontal</button>
-                <button id="bgToggleBtn" onclick="toggleBackgroundPanel()" title="Page Layout">🎨</button>
+                <!-- Add Blank Page -->
+                <button onclick="addBlankPage()" title="Add Blank Page" style="font-weight:bold;">
+                    <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                </button>
+                <!-- View Mode Toggle -->
+                <button id="viewModeToggleBtn" class="btn-view-mode" onclick="toggleViewMode()">
+                    <svg viewBox="0 0 24 24"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg> Horizontal
+                </button>
+                <!-- Background Toggle -->
+                <button id="bgToggleBtn" onclick="toggleBackgroundPanel()" title="Page Layout">
+                    <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 19.4c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0l1.9-1.9C9.22 19.57 10.57 20 12 20c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 15c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/></svg>
+                </button>
 
                 <span style="opacity:0.2">|</span>
-                <button id="undoBtn" onclick="undo()" title="Undo">↩️</button>
+                <!-- Undo -->
+                <button id="undoBtn" onclick="undo()" title="Undo">
+                    <svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
+                </button>
 
-                <button id="penBtn" onclick="toggleTool('pen')" title="Pen">✏️</button>
-                <button id="textBtn" onclick="toggleTool('text')" title="Text">📝</button>
+                <!-- Pen -->
+                <button id="penBtn" onclick="toggleTool('pen')" title="Pen">
+                    <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+                </button>
+                <!-- Text -->
+                <button id="textBtn" onclick="toggleTool('text')" title="Text">
+                    <svg viewBox="0 0 24 24"><path d="M5 4v3h5v12h3V7h5V4H5z"/></svg>
+                </button>
                 
                 <input type="file" id="imgUploader" accept="image/*" style="display:none;" onchange="handleImageUpload(event)">
-                <button onclick="document.getElementById('imgUploader').click()" title="Add Image">🖼️</button>
+                <!-- Image -->
+                <button onclick="document.getElementById('imgUploader').click()" title="Add Image">
+                    <svg viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>
+                </button>
                 
-                <button id="eraserBtn" onclick="toggleTool('eraser')" title="Eraser">🧹</button>
+                <!-- Eraser -->
+                <button id="eraserBtn" onclick="toggleTool('eraser')" title="Eraser">
+                    <svg viewBox="0 0 24 24"><path d="M15.14 3c-.51 0-1.02.2-1.41.59L2.59 14.73c-.78.78-.78 2.05 0 2.83L6.44 21.4c.39.39.9.59 1.41.59h11.16v-2h-5.58l7.13-7.13c.78-.78.78-2.05 0-2.83l-4.01-4.01c-.39-.39-.9-.59-1.41-.59zm-2.12 4.41l3.59 3.59-4.24 4.24-3.59-3.59 4.24-4.24z"/></svg>
+                </button>
 
                 <div class="color-palette">
                     <input type="color" id="colorPicker" value="#000000" style="width:20px; height:20px; padding:0; border:none; background:none; cursor:pointer;">
@@ -435,22 +676,17 @@
             </div>
 
             <div id="size-slider-panel" class="apple-glass glass-bar-width">
-                <span id="sizeSliderLabel" style="font-size:12px;">📏 Size:</span>
+                <span id="sizeSliderLabel" style="font-size:12px; font-weight:600;">Size:</span>
                 <input type="range" id="toolSizeSlider" class="size-slider" min="1" max="100" value="5" oninput="updateToolSize(this.value)">
                 <span id="sizeValBadge" class="size-val-badge">5</span>
             </div>
 
             <div id="background-panel" class="apple-glass glass-bar-width">
-                <span style="font-size:12px; font-weight:bold; color:#fff;">Page Layout:</span>
+                <span style="font-size:12px; font-weight:bold; color:#1c1c1e;">Page Layout:</span>
                 <button class="circle-btn btn-blank" onclick="setGlobalPageStyle('blank')" title="Blank Page"></button>
                 <button class="circle-btn btn-lined" onclick="setGlobalPageStyle('lined')" title="Lined Page"></button>
                 <button class="circle-btn btn-grid" onclick="setGlobalPageStyle('grid')" title="Grid Page"></button>
             </div>
-        </div>
-
-        <div class="side-action-buttons">
-            <button class="add-page-btn" onclick="addBlankPage()" title="Add Blank Page">➕</button>
-            <button class="delete-page-btn" onclick="confirmDeleteCurrentPage()" title="Delete Current Page">🗑️</button>
         </div>
 
         <div id="viewer-container" class="horizontal"></div>
@@ -463,25 +699,44 @@
     </div>
 
     <script>
-        // تسجيل Service Worker
+        function autoEnableFullScreen() {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            }
+        }
+        document.addEventListener('click', autoEnableFullScreen, { once: true });
+        document.addEventListener('touchstart', autoEnableFullScreen, { once: true });
+
+        // تحديث الوقت بتنسيق 12 ساعة مع الثواني والبطارية
+        function updateSystemStatus() {
+            const timeSpan = document.getElementById('time-display');
+            const batterySpan = document.getElementById('battery-display');
+            
+            const now = new Date();
+            timeSpan.innerText = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+
+            if (navigator.getBattery) {
+                navigator.getBattery().then(battery => {
+                    const level = Math.round(battery.level * 100);
+                    batterySpan.innerText = (battery.charging ? "⚡ " : "🔋 ") + level + "%";
+                });
+            } else {
+                batterySpan.innerText = "🔋 100%";
+            }
+        }
+        setInterval(updateSystemStatus, 1000);
+        updateSystemStatus();
+
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js')
-                    .then(reg => console.log('Service Worker registered! scope:', reg.scope))
-                    .catch(err => console.log('Service Worker registration failed:', err));
+                navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration failed:', err));
             });
         }
-
-        let deferredPrompt;
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault();
-            deferredPrompt = e;
-        });
 
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         let db;
-        const request = indexedDB.open("AppleGlassPDFDB", 1);
+        const request = indexedDB.open("AppleGlassPDFDB", 2);
         request.onupgradeneeded = e => {
             db = e.target.result;
             if (!db.objectStoreNames.contains("files")) {
@@ -497,19 +752,19 @@
         let currentFileId = null, pdfDoc = null, currentPage = 1;
         let pageOrder = []; 
         let renderQualityScale = 1.5; 
-        let baseScale = 1.3, zoomScale = 1.0; 
-        let currentDrawings = {}, currentTexts = {}, currentImages = {}; 
+        let baseScale = 1.2, zoomScale = 1.0; 
+        let currentDrawings = {}, currentTexts = {}, currentImages = {}, currentBookmarks = {}; 
         let viewMode = 'horizontal';
         let globalPageStyle = 'blank';
 
         let historyStack = [];
-        let recentColorsList = ['#000000', '#ff3b30', '#007aff', '#34c759', '#ff9500'];
+        let recentColorsList = ['#000000', '#333333', '#666666', '#999999', '#cccccc'];
         let activeColor = '#000000';
         let activeTextNode = null;
 
         let isDrawing = false;
         let currentTool = null; 
-        let toolSizes = { pen: 5, eraser: 30, text: 18 };
+        let toolSizes = { pen: 4, eraser: 30, text: 18 };
 
         let lastDeletedItem = null;
         let toastTimeout = null;
@@ -525,6 +780,110 @@
                 toggleEditMode(false);
             }
         });
+
+        function toggleSidebar(open) {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            if (open) {
+                renderSidebarBookmarks();
+                sidebar.classList.add('open');
+                overlay.classList.add('show');
+            } else {
+                sidebar.classList.remove('open');
+                overlay.classList.remove('show');
+            }
+        }
+
+        function toggleCurrentPageBookmark() {
+            if (!currentFileId) return;
+            if (!currentBookmarks[currentPage]) {
+                currentBookmarks[currentPage] = `Page ${currentPage} Bookmark`;
+            } else {
+                delete currentBookmarks[currentPage];
+            }
+            updatePageBookmarkUI(currentPage);
+            savePageDataNow(currentPage);
+            renderSidebarBookmarks();
+        }
+
+        function updatePageBookmarkUI(displayIndex) {
+            const wrapper = document.querySelector(`.page-wrapper[data-page-num="${displayIndex}"]`);
+            const btn = document.getElementById('bookmarkToggleBtn');
+            if (!wrapper) return;
+
+            if (currentBookmarks[displayIndex]) {
+                wrapper.classList.add('bookmarked');
+                if (displayIndex === currentPage && btn) btn.classList.add('active');
+            } else {
+                wrapper.classList.remove('bookmarked');
+                if (displayIndex === currentPage && btn) btn.classList.remove('active');
+            }
+        }
+
+        function renderSidebarBookmarks() {
+            const listContainer = document.getElementById('sidebarBookmarksList');
+            if (!listContainer) return;
+            listContainer.innerHTML = '';
+
+            const pagesWithBookmarks = Object.keys(currentBookmarks).map(Number).sort((a,b) => a - b);
+            
+            if (pagesWithBookmarks.length === 0) {
+                listContainer.innerHTML = `<div style="text-align: center; color: #8e8e93; font-size: 13px; margin-top: 30px;">No bookmarks yet.<br>Click the bookmark icon on any page to add one.</div>`;
+                return;
+            }
+
+            pagesWithBookmarks.forEach(pNum => {
+                const title = currentBookmarks[pNum];
+                const item = document.createElement('div');
+                item.className = 'bookmark-item';
+
+                const info = document.createElement('div');
+                info.className = 'bookmark-info';
+
+                const titleEl = document.createElement('div');
+                titleEl.className = 'bookmark-title';
+                titleEl.contentEditable = true;
+                titleEl.innerText = title;
+                titleEl.onblur = () => {
+                    currentBookmarks[pNum] = titleEl.innerText || `Page ${pNum}`;
+                    savePageDataNow(currentPage);
+                };
+
+                const pageEl = document.createElement('div');
+                pageEl.className = 'bookmark-page';
+                pageEl.innerText = `Page ${pNum}`;
+
+                info.appendChild(titleEl);
+                info.appendChild(pageEl);
+
+                const actions = document.createElement('div');
+                actions.className = 'bookmark-actions';
+
+                const delBtn = document.createElement('button');
+                delBtn.className = 'bookmark-delete';
+                delBtn.innerHTML = '✕';
+                delBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    delete currentBookmarks[pNum];
+                    updatePageBookmarkUI(pNum);
+                    savePageDataNow(currentPage);
+                    renderSidebarBookmarks();
+                };
+
+                actions.appendChild(delBtn);
+
+                item.appendChild(info);
+                item.appendChild(actions);
+
+                item.onclick = (e) => {
+                    if (e.target === titleEl || e.target.closest('.bookmark-title')) return;
+                    goToPage(pNum);
+                    toggleSidebar(false);
+                };
+
+                listContainer.appendChild(item);
+            });
+        }
 
         function toggleBackgroundPanel() {
             const panel = document.getElementById('background-panel');
@@ -576,18 +935,8 @@
                 indicator.style.color = '#ff9500';
                 indicator.innerText = '● Saving...';
             } else {
-                indicator.style.color = '#30d158';
+                indicator.style.color = '#34c759';
                 indicator.innerText = '● Saved';
-            }
-        }
-
-        function toggleFullScreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(() => {});
-            } else {
-                if (document.exitFullscreen) {
-                    document.exitFullscreen();
-                }
             }
         }
 
@@ -604,7 +953,7 @@
             document.getElementById('colorPicker').value = hex;
             recentColorsList = recentColorsList.filter(c => c.toLowerCase() !== hex.toLowerCase());
             recentColorsList.unshift(hex);
-            if (recentColorsList.length > 4) recentColorsList.pop();
+            if (recentColorsList.length > 5) recentColorsList.pop();
             renderRecentColors();
 
             if (activeTextNode) {
@@ -667,7 +1016,7 @@
                 const arrayBuffer = ev.target.result;
                 const uint8Array = new Uint8Array(arrayBuffer);
                 
-                const record = { id: id, name: file.name, data: uint8Array, drawings: {}, texts: {}, images: {}, pageOrder: [] };
+                const record = { id: id, name: file.name, data: uint8Array, drawings: {}, texts: {}, images: {}, bookmarks: {}, pageOrder: [] };
                 const tx = db.transaction("files", "readwrite");
                 tx.objectStore("files").add(record).onsuccess = () => { 
                     loadHomeFiles(); 
@@ -687,6 +1036,7 @@
                 currentDrawings = record.drawings || {};
                 currentTexts = record.texts || {};
                 currentImages = record.images || {};
+                currentBookmarks = record.bookmarks || {};
                 currentPage = 1;
                 zoomScale = 1.0;
 
@@ -730,7 +1080,6 @@
             currentImages = shiftDict(currentImages);
         }
 
-        // --- تم تحديث وتأمين دالة الإضافة ---
         async function addBlankPage() {
             try {
                 if (!currentFileId || !pdfDoc) return;
@@ -746,7 +1095,6 @@
                 });
                 
                 if (!record) throw new Error("Document not found in database.");
-                if (typeof PDFLib === 'undefined') throw new Error("PDFLib is not loaded. Please check internet connection.");
 
                 const pdfLibDoc = await PDFLib.PDFDocument.load(record.data);
                 const pages = pdfLibDoc.getPages();
@@ -770,6 +1118,7 @@
                 record.drawings = currentDrawings;
                 record.texts = currentTexts;
                 record.images = currentImages;
+                record.bookmarks = currentBookmarks;
                 
                 await new Promise((resolve, reject) => {
                     const tx2 = db.transaction("files", "readwrite");
@@ -780,12 +1129,10 @@
                 
                 const targetPage = currentPage + 1;
 
-                // تحرير الذاكرة من الملف القديم لتجنب الـ Crash
                 if (pdfDoc) {
                     try { await pdfDoc.destroy(); } catch(e){}
                 }
 
-                // تمرير نسخة جديدة من البيانات للمكتبة
                 pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(newPdfBytes) }).promise;
                 await initVirtualViewer();
                 goToPage(targetPage); 
@@ -793,26 +1140,21 @@
 
             } catch (error) {
                 console.error(error);
-                alert("حدث خطأ أثناء إضافة الصفحة: " + error.message);
+                alert("Error adding page: " + error.message);
                 updateAutosaveIndicator('saved');
             }
         }
 
-        function confirmDeleteCurrentPage() {
-            confirmDeletePage(currentPage);
-        }
-        
         async function confirmDeletePage(pageIndex) {
             if (pageOrder.length <= 1) {
                 alert("Cannot delete the only remaining page.");
                 return;
             }
-            if (confirm(`هل أنت متأكد من حذف الصفحة رقم ${pageIndex}؟`)) {
+            if (confirm(`Are you sure you want to delete page ${pageIndex}?`)) {
                 await deletePage(pageIndex);
             }
         }
 
-        // --- تم تحديث وتأمين دالة الحذف ---
         async function deletePage(pageIndex) {
             try {
                 await savePageDataNow(currentPage);
@@ -844,6 +1186,7 @@
                 record.drawings = currentDrawings;
                 record.texts = currentTexts;
                 record.images = currentImages;
+                record.bookmarks = currentBookmarks;
 
                 await new Promise((resolve, reject) => {
                     const tx2 = db.transaction("files", "readwrite");
@@ -854,7 +1197,6 @@
 
                 if (currentPage > pageOrder.length) currentPage = pageOrder.length;
 
-                // تحرير الذاكرة
                 if (pdfDoc) {
                     try { await pdfDoc.destroy(); } catch(e){}
                 }
@@ -865,7 +1207,7 @@
 
             } catch (error) {
                 console.error(error);
-                alert("حدث خطأ أثناء حذف الصفحة: " + error.message);
+                alert("Error deleting page: " + error.message);
                 updateAutosaveIndicator('saved');
             }
         }
@@ -881,10 +1223,10 @@
 
             if (viewMode === 'vertical') {
                 container.className = 'vertical';
-                toggleBtn.innerHTML = '↕️ Vertical';
+                toggleBtn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M11 6.99L7 3l-4 3.99h3V14h2V6.99h3zm8 10.02L15 21l3.99-4v-3h-2v3.01h-3z"/></svg> Vertical`;
             } else {
                 container.className = 'horizontal';
-                toggleBtn.innerHTML = '↔️ Horizontal';
+                toggleBtn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg> Horizontal`;
                 updatePageDisplay();
             }
             applyZoomTransform();
@@ -910,6 +1252,16 @@
                             renderPageContent(pageWrapper, actualPageNum, displayIndex);
                             renderedPages.add(displayIndex);
                         }
+                    } else {
+                        if (renderedPages.has(displayIndex)) {
+                            const canvases = pageWrapper.querySelectorAll('canvas');
+                            canvases.forEach(c => {
+                                const ctx = c.getContext('2d');
+                                if (ctx) ctx.clearRect(0, 0, c.width, c.height);
+                            });
+                            pageWrapper.dataset.rendered = "false";
+                            renderedPages.delete(displayIndex);
+                        }
                     }
                 });
             }, { root: container, rootMargin: '300px 0px' });
@@ -923,10 +1275,21 @@
                 pageWrapper.dataset.pageNum = displayIndex;
                 pageWrapper.dataset.actualPage = actualPageNum;
 
+                // إضافة البوكمارك الحمراء على الصفحة من فوق وتحتها ظل
+                const bookmarkBadge = document.createElement('div');
+                bookmarkBadge.className = 'page-bookmark-badge';
+                bookmarkBadge.innerHTML = '🔖';
+                bookmarkBadge.onclick = () => {
+                    goToPage(displayIndex);
+                    toggleSidebar(true);
+                };
+                pageWrapper.appendChild(bookmarkBadge);
+
                 container.appendChild(pageWrapper);
                 pageObserver.observe(pageWrapper);
 
                 renderThumbnailSkeleton(displayIndex, actualPageNum);
+                updatePageBookmarkUI(displayIndex);
             }
 
             applyViewModeUI();
@@ -947,22 +1310,32 @@
             pageWrapper.style.width = (viewport.width * zoomScale) + 'px';
             pageWrapper.style.height = (viewport.height * zoomScale) + 'px';
 
-            const pdfCanvas = document.createElement('canvas');
-            pdfCanvas.className = 'pdf-render';
+            let pdfCanvas = pageWrapper.querySelector('canvas.pdf-render');
+            if (!pdfCanvas) {
+                pdfCanvas = document.createElement('canvas');
+                pdfCanvas.className = 'pdf-render';
+                pageWrapper.appendChild(pdfCanvas);
+            }
             pdfCanvas.width = hdViewport.width;
             pdfCanvas.height = hdViewport.height;
-            
-            const textLayerDiv = document.createElement('div');
-            textLayerDiv.className = 'textLayer';
 
-            const drawCanvas = document.createElement('canvas');
-            drawCanvas.className = 'draw-canvas';
+            let textLayerDiv = pageWrapper.querySelector('.textLayer');
+            if (!textLayerDiv) {
+                textLayerDiv = document.createElement('div');
+                textLayerDiv.className = 'textLayer';
+                pageWrapper.appendChild(textLayerDiv);
+            } else {
+                textLayerDiv.innerHTML = '';
+            }
+
+            let drawCanvas = pageWrapper.querySelector('canvas.draw-canvas');
+            if (!drawCanvas) {
+                drawCanvas = document.createElement('canvas');
+                drawCanvas.className = 'draw-canvas';
+                pageWrapper.appendChild(drawCanvas);
+            }
             drawCanvas.width = hdViewport.width;
             drawCanvas.height = hdViewport.height;
-
-            pageWrapper.appendChild(pdfCanvas);
-            pageWrapper.appendChild(textLayerDiv);
-            pageWrapper.appendChild(drawCanvas);
 
             page.render({ 
                 canvasContext: pdfCanvas.getContext('2d'), 
@@ -1034,7 +1407,7 @@
                         obs.disconnect();
                         const page = await pdfDoc.getPage(actualPageNum);
                         const thumbCanvas = document.createElement('canvas');
-                        const thumbViewport = page.getViewport({ scale: 0.15 });
+                        const thumbViewport = page.getViewport({ scale: 0.12 });
                         thumbCanvas.width = thumbViewport.width;
                         thumbCanvas.height = thumbViewport.height;
                         thumbItem.insertBefore(thumbCanvas, pageNumBadge);
@@ -1085,6 +1458,7 @@
                 const wrapper = container.querySelector(`.page-wrapper[data-actual-page="${actualPage}"]`);
                 if (wrapper) {
                     wrapper.dataset.pageNum = newDisplayIndex;
+                    updatePageBookmarkUI(newDisplayIndex);
                 }
             });
 
@@ -1167,6 +1541,12 @@
                 }
             }
             
+            const bookmarkBtn = document.getElementById('bookmarkToggleBtn');
+            if (bookmarkBtn) {
+                if (currentBookmarks[currentPage]) bookmarkBtn.classList.add('active');
+                else bookmarkBtn.classList.remove('active');
+            }
+
             const thumbs = document.querySelectorAll('.thumb-item');
             thumbs.forEach((thumb) => {
                 const pNum = parseInt(thumb.dataset.pageNum);
@@ -1197,7 +1577,9 @@
             });
         }
 
+        /* الزوم والتحريك الحر للوصول لكل ركن ومكان في الصفحة بكامل الحرية */
         let initialDistance = null;
+        let pinchCenter = { x: 0, y: 0 };
         const viewer = document.getElementById('viewer-container');
         const editorScreen = document.getElementById('editor-screen');
 
@@ -1214,6 +1596,12 @@
                     e.touches[0].clientX - e.touches[1].clientX,
                     e.touches[0].clientY - e.touches[1].clientY
                 );
+
+                const rect = viewer.getBoundingClientRect();
+                pinchCenter = {
+                    x: (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left + viewer.scrollLeft,
+                    y: (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top + viewer.scrollTop
+                };
             }
         }, { passive: true });
 
@@ -1223,10 +1611,22 @@
                     e.touches[0].clientX - e.touches[1].clientX,
                     e.touches[0].clientY - e.touches[1].clientY
                 );
-                const factor = currentDistance / initialDistance;
-                zoomScale = Math.max(0.6, Math.min(4.0, zoomScale * factor));
                 
-                requestAnimationFrame(applyZoomTransform);
+                const factor = currentDistance / initialDistance;
+                const prevScale = zoomScale;
+                const newScale = Math.max(0.6, Math.min(4.0, prevScale * factor));
+                
+                if (newScale !== prevScale) {
+                    const scaleRatio = newScale / prevScale;
+                    zoomScale = newScale;
+
+                    requestAnimationFrame(() => {
+                        applyZoomTransform();
+                        viewer.scrollLeft = pinchCenter.x * scaleRatio - (pinchCenter.x - viewer.scrollLeft);
+                        viewer.scrollTop = pinchCenter.y * scaleRatio - (pinchCenter.y - viewer.scrollTop);
+                    });
+                }
+
                 initialDistance = currentDistance;
             }
         }, { passive: true });
@@ -1262,7 +1662,7 @@
 
         function updateToolButtonsUI() {
             document.querySelectorAll('#toolbar button').forEach(b => {
-                if (b.id !== 'viewModeToggleBtn' && b.id !== 'undoBtn' && b.id !== 'fullscreenBtn' && b.id !== 'bgToggleBtn') b.classList.remove('active');
+                if (b.id !== 'viewModeToggleBtn' && b.id !== 'undoBtn' && b.id !== 'bgToggleBtn' && b.id !== 'bookmarkToggleBtn') b.classList.remove('active');
             });
             if (currentTool === 'pen') document.getElementById('penBtn').classList.add('active');
             if (currentTool === 'text') document.getElementById('textBtn').classList.add('active');
@@ -1283,11 +1683,11 @@
 
             panel.style.display = 'flex';
             if (toolName === 'text') {
-                label.innerText = '🔤 Font Size:';
+                label.innerText = 'Font Size:';
                 slider.min = "10";
                 slider.max = "80";
             } else {
-                label.innerText = '📏 Size:';
+                label.innerText = 'Size:';
                 slider.min = "1";
                 slider.max = "100";
             }
@@ -1311,6 +1711,9 @@
                 }
             }
         }
+
+        let strokePoints = [];
+        const eraserCursor = document.getElementById('eraser-cursor');
 
         function initDrawingEvents(canvas, displayIndex, actualPageNum) {
             const ctx = canvas.getContext('2d');
@@ -1348,38 +1751,92 @@
                 if (historyStack.length > 20) historyStack.shift();
 
                 const pos = getPos(e);
-                ctx.beginPath();
-                ctx.moveTo(pos.x, pos.y);
+                strokePoints = [pos];
 
-                const currentSize = toolSizes[currentTool] * renderQualityScale;
+                const currentSize = toolSizes[currentTool] * (baseScale * renderQualityScale);
 
                 if (currentTool === 'eraser') {
                     ctx.globalCompositeOperation = 'destination-out';
                     ctx.lineWidth = currentSize;
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
+
+                    const displaySize = toolSizes['eraser'] * zoomScale;
+                    eraserCursor.style.width = displaySize + 'px';
+                    eraserCursor.style.height = displaySize + 'px';
+                    eraserCursor.style.left = e.clientX + 'px';
+                    eraserCursor.style.top = e.clientY + 'px';
+                    eraserCursor.style.display = 'block';
                 } else {
                     ctx.globalCompositeOperation = 'source-over';
                     ctx.strokeStyle = activeColor;
                     ctx.lineWidth = currentSize;
                     ctx.lineCap = 'round';
                     ctx.lineJoin = 'round';
+                    
+                    ctx.beginPath();
+                    ctx.arc(pos.x, pos.y, currentSize / 2, 0, Math.PI * 2);
+                    ctx.fillStyle = activeColor;
+                    ctx.fill();
                 }
             };
 
             canvas.onpointermove = e => {
+                if (currentTool === 'eraser' && isDrawing) {
+                    eraserCursor.style.left = e.clientX + 'px';
+                    eraserCursor.style.top = e.clientY + 'px';
+                }
+
                 if (!isDrawing || !currentTool) return;
                 const pos = getPos(e);
-                ctx.lineTo(pos.x, pos.y);
-                ctx.stroke();
+
+                if (currentTool === 'pen') {
+                    strokePoints.push(pos);
+                    
+                    if (strokePoints.length >= 3) {
+                        const len = strokePoints.length;
+                        const p0 = strokePoints[len - 3];
+                        const p1 = strokePoints[len - 2];
+                        const p2 = strokePoints[len - 1];
+
+                        const mid1 = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 };
+                        const mid2 = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+
+                        ctx.beginPath();
+                        ctx.moveTo(mid1.x, mid1.y);
+                        ctx.quadraticCurveTo(p1.x, p1.y, mid2.x, mid2.y);
+                        ctx.stroke();
+                    } else if (strokePoints.length === 2) {
+                        ctx.beginPath();
+                        ctx.moveTo(strokePoints[0].x, strokePoints[0].y);
+                        ctx.lineTo(strokePoints[1].x, strokePoints[1].y);
+                        ctx.stroke();
+                    }
+                } else if (currentTool === 'eraser') {
+                    const lastPt = strokePoints[strokePoints.length - 1] || pos;
+                    ctx.beginPath();
+                    ctx.moveTo(lastPt.x, lastPt.y);
+                    ctx.lineTo(pos.x, pos.y);
+                    ctx.stroke();
+                    strokePoints.push(pos);
+                }
             };
 
             canvas.onpointerup = () => {
                 endTouch();
+                eraserCursor.style.display = 'none';
                 if (isDrawing) {
                     isDrawing = false;
+                    strokePoints = [];
                     savePageData(displayIndex);
                 }
+            };
+
+            canvas.onpointercancel = () => {
+                endTouch();
+                eraserCursor.style.display = 'none';
+                isDrawing = false;
+                strokePoints = [];
             };
         }
 
@@ -1402,7 +1859,6 @@
             }
         }
 
-        // --- تم تأمين دالة الحفظ بـ Try/Catch ---
         function savePageDataNow(displayIndex) {
             return new Promise((resolve, reject) => {
                 try {
@@ -1454,6 +1910,7 @@
                             data.drawings = currentDrawings;
                             data.texts = currentTexts;
                             data.images = currentImages;
+                            data.bookmarks = currentBookmarks;
                             data.pageOrder = [...pageOrder];
                             const putReq = store.put(data);
                             putReq.onsuccess = () => resolve();
