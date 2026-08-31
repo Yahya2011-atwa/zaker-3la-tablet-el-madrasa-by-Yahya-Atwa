@@ -303,10 +303,12 @@
             flex-direction: row;
             gap: 0;
             padding: 180px;
+            padding-bottom: max(180px, calc(180px + env(safe-area-inset-bottom)));
             touch-action: pan-x pan-y pinch-zoom;
             -webkit-overflow-scrolling: touch;
             overscroll-behavior: contain;
             scroll-behavior: auto;
+            scrollbar-width: auto;
             will-change: scroll-position;
             scrollbar-gutter: stable;
         }
@@ -552,6 +554,9 @@
 
         .thumb-item.active { border-color: #1c1c1e; box-shadow: 0 0 12px rgba(0, 0, 0, 0.2); transform: scale(1.05); }
         .thumb-item canvas { display: block; height: 60px; width: auto; border-radius: 6px; pointer-events: none; }
+        .thumb-item { overflow: visible; }
+        .thumb-annotation-canvas { position: absolute; left: 0; top: 0; height: 60px; width: auto; border-radius: 6px; pointer-events: none; z-index: 1; }
+        .thumb-page-num { z-index: 2; }
 
         .thumb-page-num {
             position: absolute; bottom: 3px; right: 3px; background: rgba(255, 255, 255, 0.85);
@@ -592,9 +597,43 @@
             #toolbar-container { top: 18px; }
             #viewer-container { padding: 180px; }
         }
+
+        /* ===== Weak-tablet performance layer ===== */
+        html.low-power * { scroll-behavior: auto !important; }
+        html.low-power .apple-glass { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
+        html.low-power .glass-bg { filter: none; opacity:.96; }
+        html.low-power #status-bar, html.low-power #eraser-cursor { backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
+        #extra-toolbar { display:flex; gap:5px; align-items:center; flex-shrink:0; }
+        #extra-toolbar button { padding:6px 9px; border-radius:20px; border:.5px solid rgba(0,0,0,.08); background:rgba(0,0,0,.04); color:#1c1c1e; cursor:pointer; font-size:13px; font-weight:600; }
+        #extra-toolbar button.active { background:#1c1c1e; color:#fff; }
+        #search-panel { display:none; align-items:center; gap:6px; padding:7px 9px; border-radius:22px; }
+        #search-panel.show { display:flex; }
+        #pdfSearchInput { flex:1; min-width:120px; border:0; outline:0; border-radius:14px; padding:7px 10px; background:rgba(0,0,0,.06); color:#1c1c1e; font-size:12px; }
+        #search-panel button { border:0; border-radius:14px; padding:7px 9px; background:rgba(0,0,0,.05); color:#1c1c1e; cursor:pointer; font-size:12px; font-weight:600; }
+        #searchStatus { min-width:46px; text-align:center; font-size:11px; opacity:.65; }
+        #zoom-controls { position:fixed; left:12px; right:auto; bottom:15px; z-index:1000; display:flex; align-items:center; gap:3px; padding:5px; border-radius:20px; }
+        #zoom-controls button { width:31px; height:31px; border:0; border-radius:16px; background:rgba(0,0,0,.05); color:#1c1c1e; cursor:pointer; font-weight:700; }
+        #zoomLabel { width:56px !important; font-size:11px !important; }
+        body.dark-mode, body.dark-mode #home-screen, body.dark-mode #editor-screen { background:#111214 !important; color:#f5f5f7; }
+        body.dark-mode .header h2, body.dark-mode .note-title, body.dark-mode .bookmark-title, body.dark-mode .bookmark-page { color:#f5f5f7; }
+        body.dark-mode .apple-glass { background:rgba(32,34,38,.92) !important; border-color:rgba(255,255,255,.12) !important; color:#f5f5f7; }
+        body.dark-mode #extra-toolbar button, body.dark-mode #zoom-controls button, body.dark-mode #search-panel button { background:rgba(255,255,255,.08); color:#f5f5f7; }
+        body.dark-mode #pdfSearchInput { background:rgba(255,255,255,.08); color:#f5f5f7; }
+        .search-page-match { outline:3px solid #ff9500; outline-offset:3px; }
+        @media (max-width:650px) {
+            #zoom-controls { left:7px; right:auto; bottom:7px; }
+            #toolbar-container { width:96vw; top:9px; }
+            #bottom-thumbnails-bar { width:96vw; bottom:7px; }
+            #viewer-container { padding:120px 70px 105px; }
+        }
+
+        .selected-node { outline:2px solid #007aff !important; outline-offset:2px; }
+        .selection-box { position:absolute; border:1.5px dashed #007aff; background:rgba(0,122,255,.08); z-index:30; pointer-events:none; }
+        #extra-toolbar button:disabled { opacity:.35; }
     </style>
 </head>
 <body>
+<script>document.documentElement.classList.toggle("low-power", (navigator.deviceMemory || 4) <= 2 || (navigator.hardwareConcurrency || 4) <= 4);</script>
 
     <div class="glass-bg"></div>
 
@@ -645,6 +684,10 @@
                 <button onclick="goHome()" title="Home">
                     <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
                 </button>
+                <!-- Fullscreen -->
+                <button id="fullscreenBtn" onclick="toggleFullscreen()" title="Fullscreen">
+                    <svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm0-4h3V7h2v5H7V10zm10 4h2v5h-5v-2h3v-3zM14 7h3v3h2V5h-5v2z"/></svg>
+                </button>
                 <!-- Bookmarks Menu Toggle -->
                 <button onclick="toggleSidebar(true)" title="Bookmarks & Outline">
                     <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM11 7h2v2h-2zm0 4h2v2h-2zm0 4h2v2h-2z"/></svg>
@@ -668,16 +711,12 @@
                 <button id="viewModeToggleBtn" class="btn-view-mode" onclick="toggleViewMode()">
                     <svg viewBox="0 0 24 24"><path d="M6.99 11L3 15l3.99 4v-3H14v-2H6.99v-3zM21 9l-3.99-4v3H10v2h7.01v3L21 9z"/></svg> Horizontal
                 </button>
-                <!-- Background Toggle -->
-                <button id="bgToggleBtn" onclick="toggleBackgroundPanel()" title="Page Layout">
-                    <svg viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 19.4c-.39.39-.39 1.02 0 1.41.39.39 1.02.39 1.41 0l1.9-1.9C9.22 19.57 10.57 20 12 20c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 15c-3.31 0-6-2.69-6-6s2.69-6 6-6 6 2.69 6 6-2.69 6-6 6z"/></svg>
-                </button>
-
-                <span style="opacity:0.2">|</span>
                 <!-- Undo -->
                 <button id="undoBtn" onclick="undo()" title="Undo">
                     <svg viewBox="0 0 24 24"><path d="M12.5 8c-2.65 0-5.05.99-6.9 2.6L2 7v9h9l-3.62-3.62c1.39-1.16 3.16-1.88 5.12-1.88 3.54 0 6.55 2.31 7.6 5.5l2.37-.78C21.08 11.03 17.15 8 12.5 8z"/></svg>
                 </button>
+                <!-- Redo -->
+                <button id="redoBtn" onclick="redo()" title="Redo">↷</button>
 
                 <!-- Pen -->
                 <button id="penBtn" onclick="toggleTool('pen')" title="Pen">
@@ -704,6 +743,10 @@
                     <div id="recentColors" style="display:flex; gap:3px;"></div>
                 </div>
 
+                <div id="extra-toolbar">
+                    <button id="selectBtn" onclick="toggleTool('select')" title="Select / Lasso">⌁</button>
+                </div>
+
                 <div id="autosave-indicator">● Saved</div>
             </div>
 
@@ -713,12 +756,15 @@
                 <span id="sizeValBadge" class="size-val-badge">5</span>
             </div>
 
-            <div id="background-panel" class="apple-glass glass-bar-width">
-                <span style="font-size:12px; font-weight:bold; color:#1c1c1e;">Page Layout:</span>
-                <button class="circle-btn btn-blank" onclick="setGlobalPageStyle('blank')" title="Blank Page"></button>
-                <button class="circle-btn btn-lined" onclick="setGlobalPageStyle('lined')" title="Lined Page"></button>
-                <button class="circle-btn btn-grid" onclick="setGlobalPageStyle('grid')" title="Grid Page"></button>
-            </div>
+
+
+        </div>
+
+        <div id="zoom-controls" class="apple-glass">
+            <button onclick="zoomByFactor(.8)" title="Zoom out">−</button>
+            <button id="zoomLabel" onclick="fitWidth()" title="Fit width">100%</button>
+            <button onclick="zoomByFactor(1.25)" title="Zoom in">+</button>
+            <button onclick="fitPage()" title="Fit page">□</button>
         </div>
 
         <div id="viewer-container" class="horizontal"></div>
@@ -731,13 +777,102 @@
     </div>
 
 <script>
-        function autoEnableFullScreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen().catch(() => {});
+        let fullscreenWanted = false;
+        let fullscreenWasActive = false;
+        let fullscreenExplicitlyExited = false;
+
+        function isFullscreenActive() {
+            return !!(document.fullscreenElement || document.webkitFullscreenElement);
+        }
+
+        function updateFullscreenButton() {
+            const btn = document.getElementById('fullscreenBtn');
+            if (!btn) return;
+            const active = isFullscreenActive();
+            btn.classList.toggle('active', active);
+            btn.title = active ? 'Exit Fullscreen' : 'Fullscreen';
+            btn.innerHTML = active
+                ? `<svg viewBox="0 0 24 24"><path d="M9 7H7v3H5V5h5v2H9zm8 3V7h-2V5h4v5h-2zM7 14H5v5h5v-2H7v-3zm10 0h2v5h-5v-2h3v-3z"/></svg>`
+                : `<svg viewBox="0 0 24 24"><path d="M7 14H5v5h5v-2H7v-3zm0-4h3V7h2v5H7V10zm10 4h2v5h-5v-2h3v-3zM14 7h3v3h2V5h-5v2z"/></svg>`;
+        }
+
+        async function requestAppFullscreen(fromUserGesture = false) {
+            if (!document.documentElement.requestFullscreen || isFullscreenActive()) {
+                updateFullscreenButton();
+                return false;
+            }
+            try {
+                await document.documentElement.requestFullscreen({ navigationUI: 'hide' });
+                fullscreenWasActive = true;
+                fullscreenExplicitlyExited = false;
+                updateFullscreenButton();
+                return true;
+            } catch (err) {
+                // Browser security can reject fullscreen without a user gesture.
+                if (fromUserGesture) console.warn('Fullscreen request rejected:', err);
+                return false;
             }
         }
-        document.addEventListener('click', autoEnableFullScreen, { once: true });
-        document.addEventListener('touchstart', autoEnableFullScreen, { once: true });
+
+        async function exitAppFullscreen() {
+            try {
+                if (document.exitFullscreen && isFullscreenActive()) {
+                    fullscreenExplicitlyExited = true;
+                    await document.exitFullscreen();
+                }
+            } catch (err) {
+                console.warn('Fullscreen exit rejected:', err);
+            } finally {
+                updateFullscreenButton();
+            }
+        }
+
+        async function toggleFullscreen() {
+            if (isFullscreenActive()) {
+                fullscreenWanted = false;
+                fullscreenExplicitlyExited = true;
+                await exitAppFullscreen();
+            } else {
+                fullscreenWanted = true;
+                fullscreenExplicitlyExited = false;
+                await requestAppFullscreen(true);
+            }
+        }
+
+        function tryRestoreFullscreenOnReturn() {
+            if (!fullscreenWanted || fullscreenExplicitlyExited) return;
+            if (document.getElementById('editor-screen')?.style.display === 'none') return;
+            if (!isFullscreenActive()) {
+                requestAppFullscreen(false);
+            }
+        }
+
+        document.addEventListener('fullscreenchange', () => {
+            const active = isFullscreenActive();
+            if (active) fullscreenWasActive = true;
+            updateFullscreenButton();
+            if (!active && fullscreenWanted && !fullscreenExplicitlyExited) {
+                setTimeout(tryRestoreFullscreenOnReturn, 120);
+            }
+        });
+        document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+        window.addEventListener('pageshow', tryRestoreFullscreenOnReturn);
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) setTimeout(tryRestoreFullscreenOnReturn, 120);
+        });
+
+        // Preserve the original convenience: the first real interaction may enter fullscreen.
+        function autoEnableFullScreenFromGesture() {
+            if (!fullscreenWanted && !isFullscreenActive() && document.getElementById('editor-screen')?.style.display !== 'none') {
+                fullscreenWanted = true;
+                requestAppFullscreen(true);
+            }
+            document.removeEventListener('pointerdown', autoEnableFullScreenFromGesture);
+            document.removeEventListener('touchstart', autoEnableFullScreenFromGesture);
+        }
+        document.addEventListener('pointerdown', autoEnableFullScreenFromGesture, { once: true });
+        document.addEventListener('touchstart', autoEnableFullScreenFromGesture, { once: true, passive: true });
+        updateFullscreenButton();
 
         // تحديث الوقت بتنسيق 12 ساعة مع الثواني والبطارية
         function updateSystemStatus() {
@@ -770,50 +905,307 @@
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
         let db;
-        const request = indexedDB.open("AppleGlassPDFDB", 2);
+        let currentPdfUrl = null;
+        // Keep PDF data chunked in IndexedDB so opening large files does not require the whole file in RAM.
+        // 4 MB is deliberately kept small for weak tablets while still avoiding excessive range requests.
+        const PDF_CHUNK_SIZE = 4 * 1024 * 1024;
+        const THUMB_SCALE = 0.12;
+
+        const request = indexedDB.open("AppleGlassPDFDB", 3);
         request.onupgradeneeded = e => {
             db = e.target.result;
             if (!db.objectStoreNames.contains("files")) {
                 db.createObjectStore("files", { keyPath: "id" });
             }
+            if (!db.objectStoreNames.contains("pages")) {
+                const pages = db.createObjectStore("pages", { keyPath: ["fileId", "page"] });
+                pages.createIndex("fileId", "fileId", { unique: false });
+            }
+            if (!db.objectStoreNames.contains("settings")) {
+                db.createObjectStore("settings", { keyPath: "fileId" });
+            }
+            if (!db.objectStoreNames.contains("chunks")) {
+                const chunks = db.createObjectStore("chunks", { keyPath: ["fileId", "index"] });
+                chunks.createIndex("fileId", "fileId", { unique: false });
+            }
         };
-        request.onsuccess = e => { 
-            db = e.target.result; 
-            loadHomeFiles(); 
+
+        request.onsuccess = e => {
+            db = e.target.result;
+            db.onversionchange = () => db.close();
+            loadHomeFiles();
             initColorPicker();
         };
+        request.onerror = e => console.error('IndexedDB error:', e.target?.error);
+
+        function idbRequest(req) {
+            return new Promise((resolve, reject) => {
+                req.onsuccess = e => resolve(e.target.result);
+                req.onerror = e => reject(e.target.error || new Error('IndexedDB request failed'));
+            });
+        }
+
+        function getRecord(id) {
+            return idbRequest(db.transaction('files', 'readonly').objectStore('files').get(id));
+        }
+
+        function putRecord(record) {
+            return idbRequest(db.transaction('files', 'readwrite').objectStore('files').put(record));
+        }
+
+        function getSettings(fileId) {
+            return idbRequest(db.transaction('settings', 'readonly').objectStore('settings').get(fileId));
+        }
+
+        function putSettings(settings) {
+            return idbRequest(db.transaction('settings', 'readwrite').objectStore('settings').put(settings));
+        }
+
+        function getPageState(fileId, actualPage) {
+            return idbRequest(db.transaction('pages', 'readonly').objectStore('pages').get([fileId, Number(actualPage)]));
+        }
+
+        function putPageState(state) {
+            return idbRequest(db.transaction('pages', 'readwrite').objectStore('pages').put(state));
+        }
+
+        function deletePageState(fileId, actualPage) {
+            return idbRequest(db.transaction('pages', 'readwrite').objectStore('pages').delete([fileId, Number(actualPage)]));
+        }
+
+        function getAllPageStates(fileId) {
+            return idbRequest(db.transaction('pages', 'readonly').objectStore('pages').index('fileId').getAll(fileId));
+        }
+
+        function getAllChunks(fileId) {
+            return idbRequest(db.transaction('chunks', 'readonly').objectStore('chunks').index('fileId').getAll(fileId));
+        }
+
+        async function storePdfInChunks(fileId, file) {
+            try {
+                if (navigator.storage?.persist) {
+                    try { await navigator.storage.persist(); } catch (_) {}
+                }
+                const count = Math.ceil(file.size / PDF_CHUNK_SIZE);
+                for (let i = 0; i < count; i++) {
+                    const blob = file.slice(i * PDF_CHUNK_SIZE, Math.min(file.size, (i + 1) * PDF_CHUNK_SIZE), 'application/octet-stream');
+                    await idbRequest(db.transaction('chunks', 'readwrite').objectStore('chunks').put({
+                        fileId, index: i, data: blob, size: blob.size
+                    }));
+                    // Yield periodically so a weak tablet keeps responding while saving very large PDFs.
+                    if ((i + 1) % 3 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+                }
+            } catch (err) {
+                console.error('Chunked PDF storage failed:', err);
+                throw err;
+            }
+        }
+
+        async function deleteAllChunks(fileId) {
+            const chunks = await getAllChunks(fileId);
+            if (!chunks.length) return;
+            const tx = db.transaction('chunks', 'readwrite');
+            const store = tx.objectStore('chunks');
+            chunks.forEach(c => store.delete([fileId, c.index]));
+            await new Promise((resolve, reject) => {
+                tx.oncomplete = resolve;
+                tx.onerror = e => reject(e.target.error);
+                tx.onabort = e => reject(e.target.error || new Error('Chunk delete aborted'));
+            });
+        }
+
+        async function readLegacyDataAsUint8Array(data) {
+            if (data instanceof Uint8Array) return data;
+            if (data instanceof ArrayBuffer) return new Uint8Array(data);
+            if (data instanceof Blob) return new Uint8Array(await data.arrayBuffer());
+            return new Uint8Array(data || []);
+        }
+
+        async function assemblePdfBytes(record) {
+            if (record?.chunked) {
+                const chunks = (await getAllChunks(record.id)).sort((a,b) => a.index - b.index);
+                const total = chunks.reduce((n, c) => n + (c.data?.size || 0), 0);
+                const result = new Uint8Array(total);
+                let offset = 0;
+                for (const c of chunks) {
+                    const part = new Uint8Array(await c.data.arrayBuffer());
+                    result.set(part, offset);
+                    offset += part.byteLength;
+                }
+                return result;
+            }
+            return readLegacyDataAsUint8Array(record?.data);
+        }
+
+        class IDBRangeTransport extends pdfjsLib.PDFDataRangeTransport {
+            constructor(fileId, length) {
+                super(length, null, false, null, false);
+                this.fileId = fileId;
+                this.length = length;
+                this.pending = new Map();
+            }
+
+            requestDataRange(begin, end) {
+                const key = begin + ':' + end;
+                if (this.pending.has(key)) return;
+                this.pending.set(key, true);
+                this._readRange(begin, end).then(bytes => {
+                    this.pending.delete(key);
+                    this.onDataRange(begin, bytes);
+                }).catch(err => {
+                    this.pending.delete(key);
+                    console.error('PDF range read error:', err);
+                });
+            }
+
+            async _readRange(begin, end) {
+                const first = Math.floor(begin / PDF_CHUNK_SIZE);
+                const last = Math.floor((Math.max(begin, end - 1)) / PDF_CHUNK_SIZE);
+                const chunks = await Promise.all(
+                    Array.from({ length: last - first + 1 }, (_, i) =>
+                        idbRequest(db.transaction('chunks', 'readonly').objectStore('chunks').get([this.fileId, first + i]))
+                    )
+                );
+
+                const output = new Uint8Array(end - begin);
+                let outOffset = 0;
+                for (let i = 0; i < chunks.length; i++) {
+                    const chunk = chunks[i];
+                    if (!chunk?.data) continue;
+                    const bytes = new Uint8Array(await chunk.data.arrayBuffer());
+                    const chunkStart = (first + i) * PDF_CHUNK_SIZE;
+                    const from = Math.max(begin, chunkStart);
+                    const to = Math.min(end, chunkStart + bytes.byteLength);
+                    if (to > from) {
+                        const part = bytes.subarray(from - chunkStart, to - chunkStart);
+                        output.set(part, outOffset);
+                        outOffset += part.byteLength;
+                    }
+                }
+                return output;
+            }
+        }
 
         let currentFileId = null, pdfDoc = null, currentPage = 1;
-        let pageOrder = []; 
-        let renderQualityScale = 1.5; 
-        let baseScale = 1.2, zoomScale = 1.0; 
-        let currentDrawings = {}, currentTexts = {}, currentImages = {}, currentBookmarks = {}; 
+        let pageOrder = [];
+        let renderQualityScale = ((navigator.deviceMemory || 4) <= 2 ? 0.85 : 1.15);
+        let baseScale = ((navigator.deviceMemory || 4) <= 2 ? 1.05 : 1.15), zoomScale = 1.0;
+        let currentDrawings = {}, currentTexts = {}, currentImages = {}, currentBookmarks = {};
         let viewMode = 'horizontal';
         let globalPageStyle = 'blank';
-
+        let savedPageViewState = {};
         let historyStack = [];
         let recentColorsList = ['#000000', '#333333', '#666666', '#999999', '#cccccc'];
         let activeColor = '#000000';
         let activeTextNode = null;
-
         let isDrawing = false;
-        let currentTool = null; 
-        let toolSizes = { pen: 4, eraser: 30, text: 18 };
-
+        let currentTool = null;
+        let toolSizes = { pen: 4, eraser: 30, text: 18, highlighter: 16 };
         let lastDeletedItem = null;
         let toastTimeout = null;
         let isEditMode = false;
         let longPressTimer = null;
-
         let pageObserver = null;
         let renderedPages = new Set();
         let saveTimeout;
+        let viewSaveTimeout;
+        let legacyMigrationDone = false;
 
-        document.addEventListener('pointerdown', (e) => {
-            if (isEditMode && !e.target.closest('#bottom-thumbnails-bar')) {
-                toggleEditMode(false);
+        async function loadDocumentState(record) {
+            currentDrawings = {};
+            currentTexts = {};
+            currentImages = {};
+            currentBookmarks = {};
+            savedPageViewState = {};
+            legacyMigrationDone = false;
+
+            const settings = await getSettings(record.id).catch(() => null);
+            if (settings) {
+                pageOrder = Array.isArray(settings.pageOrder) ? [...settings.pageOrder] : [];
+                currentBookmarks = settings.bookmarks || {};
+                viewMode = settings.viewMode || 'horizontal';
+                globalPageStyle = settings.globalPageStyle || 'blank';
+                savedPageViewState = settings.pageViewState || {};
+            } else if (record.pageOrder?.length) {
+                pageOrder = [...record.pageOrder];
+                currentBookmarks = record.bookmarks || {};
+                viewMode = record.viewMode || 'horizontal';
+                globalPageStyle = record.globalPageStyle || 'blank';
+                savedPageViewState = record.pageViewState || {};
             }
-        });
+
+            const pageStates = await getAllPageStates(record.id).catch(() => []);
+            if (pageStates.length) {
+                pageStates.forEach(state => {
+                    const p = Number(state.page);
+                    if (state.drawings) currentDrawings[p] = state.drawings;
+                    if (state.texts) currentTexts[p] = state.texts;
+                    if (state.images) currentImages[p] = state.images;
+                });
+            } else if (record.drawings || record.texts || record.images) {
+                currentDrawings = record.drawings || {};
+                currentTexts = record.texts || {};
+                currentImages = record.images || {};
+                await migrateLegacyAnnotations(record);
+            }
+        }
+
+        async function migrateLegacyAnnotations(record) {
+            if (legacyMigrationDone || !currentFileId) return;
+            legacyMigrationDone = true;
+            const pages = new Set([
+                ...Object.keys(currentDrawings || {}),
+                ...Object.keys(currentTexts || {}),
+                ...Object.keys(currentImages || {})
+            ].map(Number).filter(Number.isFinite));
+            for (const actualPage of pages) {
+                await putPageState({
+                    fileId: currentFileId,
+                    page: actualPage,
+                    drawings: currentDrawings[actualPage] || null,
+                    texts: currentTexts[actualPage] || [],
+                    images: currentImages[actualPage] || []
+                });
+            }
+            await putSettings({
+                fileId: currentFileId,
+                pageOrder: [...pageOrder],
+                bookmarks: currentBookmarks,
+                viewMode,
+                globalPageStyle,
+                pageViewState: savedPageViewState
+            });
+        }
+
+        async function openPdfForRecord(record) {
+            if (currentPdfUrl) {
+                URL.revokeObjectURL(currentPdfUrl);
+                currentPdfUrl = null;
+            }
+            if (pdfDoc) {
+                try { await pdfDoc.destroy(); } catch (e) {}
+                pdfDoc = null;
+            }
+
+            if (record.chunked) {
+                const range = new IDBRangeTransport(record.id, record.size);
+                pdfDoc = await pdfjsLib.getDocument({
+                    range,
+                    length: record.size,
+                    disableStream: true,
+                    disableAutoFetch: true,
+                    rangeChunkSize: PDF_CHUNK_SIZE
+                }).promise;
+            } else {
+                const legacyBlob = record.data instanceof Blob ? record.data : new Blob([await readLegacyDataAsUint8Array(record.data)], { type: 'application/pdf' });
+                currentPdfUrl = URL.createObjectURL(legacyBlob);
+                pdfDoc = await pdfjsLib.getDocument({
+                    url: currentPdfUrl,
+                    disableStream: false,
+                    disableAutoFetch: false
+                }).promise;
+            }
+        }
 
         function toggleSidebar(open) {
             const sidebar = document.getElementById('sidebar');
@@ -836,7 +1228,7 @@
                 delete currentBookmarks[currentPage];
             }
             updatePageBookmarkUI(currentPage);
-            savePageDataNow(currentPage);
+            saveDocumentSettings();
             renderSidebarBookmarks();
         }
 
@@ -880,7 +1272,7 @@
                 titleEl.innerText = title;
                 titleEl.onblur = () => {
                     currentBookmarks[pNum] = titleEl.innerText || `Page ${pNum}`;
-                    savePageDataNow(currentPage);
+                    saveDocumentSettings();
                 };
 
                 const pageEl = document.createElement('div');
@@ -900,7 +1292,7 @@
                     e.stopPropagation();
                     delete currentBookmarks[pNum];
                     updatePageBookmarkUI(pNum);
-                    savePageDataNow(currentPage);
+                    saveDocumentSettings();
                     renderSidebarBookmarks();
                 };
 
@@ -941,6 +1333,7 @@
                 page.classList.remove('blank', 'lined', 'grid');
                 page.classList.add(style);
             });
+            saveDocumentSettings();
         }
 
         function showUndoToast(message, restoreCallback) {
@@ -1013,89 +1406,160 @@
             });
         }
 
-        function loadHomeFiles() {
+        async function loadHomeFiles() {
             const grid = document.getElementById('notesGrid');
-            if (!grid) return;
+            if (!grid || !db) return;
             grid.innerHTML = '';
-            const tx = db.transaction("files", "readonly");
-            tx.objectStore("files").getAll().onsuccess = e => {
-                e.target.result.forEach(f => {
+            try {
+                const files = await idbRequest(db.transaction('files', 'readonly').objectStore('files').getAll());
+                files.sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
+                files.forEach(f => {
                     const card = document.createElement('div');
                     card.className = 'note-card apple-glass';
-                    card.innerHTML = `<button class="delete-btn" onclick="removeFile('${f.id}', event)">✕</button>
-                                      <div class="pdf-icon">📄</div>
-                                      <div class="note-title">${f.name}</div>`;
+                    const del = document.createElement('button');
+                    del.className = 'delete-btn';
+                    del.textContent = '✕';
+                    del.onclick = e => removeFile(f.id, e);
+                    const icon = document.createElement('div');
+                    icon.className = 'pdf-icon';
+                    icon.textContent = '📄';
+                    const title = document.createElement('div');
+                    title.className = 'note-title';
+                    title.textContent = f.name;
+                    card.append(del, icon, title);
+                    card.title = f.chunked ? `${f.name} • ${(f.size / (1024 ** 2)).toFixed(1)} MB` : f.name;
                     card.onclick = () => openPDF(f.id);
                     grid.appendChild(card);
                 });
-            };
+            } catch (err) {
+                console.error('Could not load files:', err);
+            }
         }
 
-        function removeFile(id, e) {
+        async function removeFile(id, e) {
             e.stopPropagation();
-            if(!confirm("Are you sure you want to delete this document?")) return;
-            const tx = db.transaction("files", "readwrite");
-            tx.objectStore("files").delete(id).onsuccess = () => loadHomeFiles();
+            if (!confirm("Are you sure you want to delete this document?")) return;
+            try {
+                await deleteAllChunks(id).catch(() => {});
+                const pageStates = await getAllPageStates(id).catch(() => []);
+                const tx = db.transaction(['files', 'pages', 'settings'], 'readwrite');
+                tx.objectStore('files').delete(id);
+                pageStates.forEach(state => tx.objectStore('pages').delete([id, state.page]));
+                tx.objectStore('settings').delete(id);
+                await new Promise((resolve, reject) => {
+                    tx.oncomplete = resolve;
+                    tx.onerror = e2 => reject(e2.target.error);
+                    tx.onabort = e2 => reject(e2.target.error || new Error('Delete aborted'));
+                });
+                if (currentFileId === id) {
+                    currentFileId = null;
+                    if (currentPdfUrl) { URL.revokeObjectURL(currentPdfUrl); currentPdfUrl = null; }
+                }
+                loadHomeFiles();
+            } catch (err) {
+                console.error('Delete file error:', err);
+                alert('Could not delete the document.');
+            }
         }
 
         async function goHome() {
-            if (currentFileId && typeof savePageDataNow === 'function') await savePageDataNow(currentPage);
+            if (currentFileId) {
+                await Promise.all([
+                    savePageDataNow(currentPage).catch(() => {}),
+                    saveDocumentSettings().catch(() => {})
+                ]);
+            }
             if (typeof toggleEditMode === 'function') toggleEditMode(false);
             document.getElementById('editor-screen').style.display = 'none';
             document.getElementById('home-screen').style.display = 'flex';
+            fullscreenWanted = false;
+            fullscreenExplicitlyExited = true;
+            if (isFullscreenActive()) await exitAppFullscreen();
             loadHomeFiles();
         }
 
-        document.getElementById('pdfUploader')?.addEventListener('change', e => {
+        document.getElementById('pdfUploader')?.addEventListener('change', async e => {
             const file = e.target.files[0];
+            e.target.value = '';
             if (!file) return;
-            const reader = new FileReader();
-            reader.onload = ev => {
-                const id = 'pdf_' + Date.now();
-                const arrayBuffer = ev.target.result;
-                const uint8Array = new Uint8Array(arrayBuffer);
-                
-                const record = { id: id, name: file.name, data: uint8Array, drawings: {}, texts: {}, images: {}, bookmarks: {}, pageOrder: [] };
-                const tx = db.transaction("files", "readwrite");
-                tx.objectStore("files").add(record).onsuccess = () => { 
-                    loadHomeFiles(); 
-                    openPDF(id); 
-                };
+            if (file.type !== 'application/pdf') {
+                alert('Please select a PDF file.');
+                return;
+            }
+
+            const id = 'pdf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
+            const record = {
+                id,
+                name: file.name,
+                size: file.size,
+                chunked: true,
+                chunkSize: PDF_CHUNK_SIZE,
+                createdAt: Date.now()
             };
-            reader.readAsArrayBuffer(file);
+
+            try {
+                updateAutosaveIndicator('saving');
+                await putRecord(record);
+                await storePdfInChunks(id, file);
+                await putSettings({
+                    fileId: id,
+                    pageOrder: [],
+                    bookmarks: {},
+                    viewMode: 'horizontal',
+                    globalPageStyle: 'blank',
+                    pageViewState: {}
+                });
+                await openPDF(id);
+                loadHomeFiles();
+            } catch (err) {
+                console.error('PDF upload failed:', err);
+                try { await deleteAllChunks(id); } catch (_) {}
+                try { await idbRequest(db.transaction('files', 'readwrite').objectStore('files').delete(id)); } catch (_) {}
+                alert('Could not save this PDF: ' + (err?.message || err));
+            } finally {
+                updateAutosaveIndicator('saved');
+            }
         });
 
-        function openPDF(id) {
-            currentFileId = id;
-            const tx = db.transaction("files", "readonly");
-            tx.objectStore("files").get(id).onsuccess = e => {
-                const record = e.target.result;
+        async function openPDF(id) {
+            try {
+                currentFileId = id;
+                const record = await getRecord(id);
                 if (!record) return;
 
-                currentDrawings = record.drawings || {};
-                currentTexts = record.texts || {};
-                currentImages = record.images || {};
-                currentBookmarks = record.bookmarks || {};
-                currentPage = 1;
-                zoomScale = 1.0;
+                await loadDocumentState(record);
+                await openPdfForRecord(record);
+
+                if (!pageOrder.length) {
+                    pageOrder = Array.from({ length: pdfDoc.numPages }, (_, i) => i + 1);
+                }
+
+                currentPage = Math.min(Math.max(Number(savedPageViewState.currentPage) || 1, 1), pageOrder.length);
+                const pageState = savedPageViewState[currentPage] || savedPageViewState[String(currentPage)] || {};
+                zoomScale = Math.max(0.5, Math.min(6.0, Number(pageState.zoomScale ?? savedPageViewState.zoomScale ?? 1)));
+                viewMode = savedPageViewState.viewMode || viewMode || 'horizontal';
+                globalPageStyle = savedPageViewState.globalPageStyle || globalPageStyle || 'blank';
 
                 document.getElementById('home-screen').style.display = 'none';
                 document.getElementById('editor-screen').style.display = 'flex';
 
-                const pdfData = record.data instanceof Uint8Array ? record.data : new Uint8Array(record.data);
-
-                pdfjsLib.getDocument({ data: pdfData }).promise.then(pdf => {
-                    pdfDoc = pdf;
-                    if (record.pageOrder && record.pageOrder.length === pdfDoc.numPages) {
-                        pageOrder = record.pageOrder;
-                    } else {
-                        pageOrder = Array.from({length: pdfDoc.numPages}, (_, i) => i + 1);
-                    }
-                    initVirtualViewer();
-                }).catch(err => {
-                    alert('Error loading PDF file: ' + err.message);
+                await putSettings({
+                    fileId: id,
+                    pageOrder: [...pageOrder],
+                    bookmarks: currentBookmarks,
+                    viewMode,
+                    globalPageStyle,
+                    pageViewState: savedPageViewState
                 });
-            };
+
+                initVirtualViewer();
+                fullscreenWanted = true;
+                fullscreenExplicitlyExited = false;
+                requestAppFullscreen(true);
+            } catch (err) {
+                console.error('Error loading PDF:', err);
+                alert('Error loading PDF file: ' + (err?.message || err));
+            }
         }
 
         function shiftAnnotations(actualPage, direction) {
@@ -1119,67 +1583,65 @@
             currentImages = shiftDict(currentImages);
         }
 
+        function shiftBookmarks(displayPage, direction) {
+            const next = {};
+            for (const key in currentBookmarks) {
+                const k = Number(key);
+                if (direction === 'insert') {
+                    if (k >= displayPage) next[k + 1] = currentBookmarks[key];
+                    else next[k] = currentBookmarks[key];
+                } else if (direction === 'delete') {
+                    if (k > displayPage) next[k - 1] = currentBookmarks[key];
+                    else if (k < displayPage) next[k] = currentBookmarks[key];
+                }
+            }
+            currentBookmarks = next;
+        }
+
         async function addBlankPage() {
             try {
                 if (!currentFileId || !pdfDoc) return;
-                
-                if (typeof savePageDataNow === 'function') await savePageDataNow(currentPage);
+                await Promise.all([savePageDataNow(currentPage), saveDocumentSettings()]);
                 updateAutosaveIndicator('saving');
-                
-                const record = await new Promise((resolve, reject) => {
-                    const tx = db.transaction("files", "readonly");
-                    const req = tx.objectStore("files").get(currentFileId);
-                    req.onsuccess = e => resolve(e.target.result);
-                    req.onerror = err => reject(err);
-                });
-                
-                if (!record) throw new Error("Document not found in database.");
 
-                const pdfLibDoc = await PDFLib.PDFDocument.load(record.data);
-                const pages = pdfLibDoc.getPages();
-                const currPage = pages[pageOrder[currentPage - 1] - 1] || pages[0];
+                const record = await getRecord(currentFileId);
+                if (!record) throw new Error('Document not found in database.');
+
+                const pdfBytes = await assemblePdfBytes(record);
+                const pdfLibDoc = await PDFLib.PDFDocument.load(pdfBytes);
+                const currPage = pdfLibDoc.getPages()[pageOrder[currentPage - 1] - 1] || pdfLibDoc.getPages()[0];
                 const { width, height } = currPage.getSize();
-                
+
                 const insertIndex = pageOrder[currentPage - 1];
                 pdfLibDoc.insertPage(insertIndex, [width, height]);
-                const newPdfBytes = await pdfLibDoc.save();
-                
+                const newPdfBytes = await pdfLibDoc.save({ useObjectStreams: true });
+
                 const newActualPageNum = insertIndex + 1;
                 shiftAnnotations(newActualPageNum, 'insert');
-
                 for (let i = 0; i < pageOrder.length; i++) {
                     if (pageOrder[i] >= newActualPageNum) pageOrder[i]++;
                 }
                 pageOrder.splice(currentPage, 0, newActualPageNum);
+                shiftBookmarks(currentPage + 1, 'insert');
 
-                record.data = newPdfBytes;
-                record.pageOrder = pageOrder;
-                record.drawings = currentDrawings;
-                record.texts = currentTexts;
-                record.images = currentImages;
-                record.bookmarks = currentBookmarks;
-                
-                await new Promise((resolve, reject) => {
-                    const tx2 = db.transaction("files", "readwrite");
-                    const req2 = tx2.objectStore("files").put(record);
-                    req2.onsuccess = () => resolve();
-                    req2.onerror = err => reject(err);
-                });
-                
-                const targetPage = currentPage + 1;
+                await deleteAllChunks(currentFileId).catch(() => {});
+                await storePdfInChunks(currentFileId, new Blob([newPdfBytes], { type: 'application/pdf' }));
+                record.size = newPdfBytes.byteLength;
+                record.chunked = true;
+                record.chunkSize = PDF_CHUNK_SIZE;
+                delete record.data;
+                await putRecord(record);
+                await replaceAllPageStates(currentFileId);
 
-                if (pdfDoc) {
-                    try { await pdfDoc.destroy(); } catch(e){}
-                }
-
-                pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(newPdfBytes) }).promise;
-                await initVirtualViewer();
-                if (typeof goToPage === 'function') goToPage(targetPage); 
+                await openPdfForRecord(record);
+                currentPage = Math.min(currentPage + 1, pageOrder.length);
+                initVirtualViewer();
+                await goToPage(currentPage);
+                await saveDocumentSettings();
                 updateAutosaveIndicator('saved');
-
             } catch (error) {
                 console.error(error);
-                alert("Error adding page: " + error.message);
+                alert('Error adding page: ' + error.message);
                 updateAutosaveIndicator('saved');
             }
         }
@@ -1196,57 +1658,43 @@
 
         async function deletePage(pageIndex) {
             try {
-                if (typeof savePageDataNow === 'function') await savePageDataNow(currentPage);
+                if (pageOrder.length <= 1) return;
+                await Promise.all([savePageDataNow(currentPage), saveDocumentSettings()]);
                 updateAutosaveIndicator('saving');
 
-                const record = await new Promise((resolve, reject) => {
-                    const tx = db.transaction("files", "readonly");
-                    const req = tx.objectStore("files").get(currentFileId);
-                    req.onsuccess = e => resolve(e.target.result);
-                    req.onerror = err => reject(err);
-                });
-                if (!record) throw new Error("Document not found.");
-
+                const record = await getRecord(currentFileId);
+                if (!record) throw new Error('Document not found.');
                 const actualToRemove = pageOrder[pageIndex - 1];
-                const pdfLibDoc = await PDFLib.PDFDocument.load(record.data);
-                
+                const pdfBytes = await assemblePdfBytes(record);
+                const pdfLibDoc = await PDFLib.PDFDocument.load(pdfBytes);
                 pdfLibDoc.removePage(actualToRemove - 1);
-                const newPdfBytes = await pdfLibDoc.save();
+                const newPdfBytes = await pdfLibDoc.save({ useObjectStreams: true });
 
                 pageOrder.splice(pageIndex - 1, 1);
                 for (let i = 0; i < pageOrder.length; i++) {
                     if (pageOrder[i] > actualToRemove) pageOrder[i]--;
                 }
-
                 shiftAnnotations(actualToRemove, 'delete');
+                shiftBookmarks(pageIndex, 'delete');
 
-                record.data = newPdfBytes;
-                record.pageOrder = pageOrder;
-                record.drawings = currentDrawings;
-                record.texts = currentTexts;
-                record.images = currentImages;
-                record.bookmarks = currentBookmarks;
-
-                await new Promise((resolve, reject) => {
-                    const tx2 = db.transaction("files", "readwrite");
-                    const req2 = tx2.objectStore("files").put(record);
-                    req2.onsuccess = () => resolve();
-                    req2.onerror = err => reject(err);
-                });
+                await deleteAllChunks(currentFileId).catch(() => {});
+                await storePdfInChunks(currentFileId, new Blob([newPdfBytes], { type: 'application/pdf' }));
+                record.size = newPdfBytes.byteLength;
+                record.chunked = true;
+                record.chunkSize = PDF_CHUNK_SIZE;
+                delete record.data;
+                await putRecord(record);
 
                 if (currentPage > pageOrder.length) currentPage = pageOrder.length;
-
-                if (pdfDoc) {
-                    try { await pdfDoc.destroy(); } catch(e){}
-                }
-
-                pdfDoc = await pdfjsLib.getDocument({ data: new Uint8Array(newPdfBytes) }).promise;
-                await initVirtualViewer();
+                await replaceAllPageStates(currentFileId);
+                await openPdfForRecord(record);
+                initVirtualViewer();
+                await goToPage(currentPage);
+                await saveDocumentSettings();
                 updateAutosaveIndicator('saved');
-
             } catch (error) {
                 console.error(error);
-                alert("Error deleting page: " + error.message);
+                alert('Error deleting page: ' + error.message);
                 updateAutosaveIndicator('saved');
             }
         }
@@ -1254,6 +1702,7 @@
         function toggleViewMode() {
             viewMode = (viewMode === 'horizontal') ? 'vertical' : 'horizontal';
             applyViewModeUI();
+            saveDocumentSettings();
         }
 
         function applyViewModeUI() {
@@ -1270,6 +1719,7 @@
                 if (typeof updatePageDisplay === 'function') updatePageDisplay();
             }
             if (typeof applyZoomTransform === 'function') applyZoomTransform();
+            scheduleDocumentSettingsSave();
         }
 
         function initVirtualViewer() {
@@ -1305,7 +1755,7 @@
                         }
                     }
                 });
-            }, { root: container, rootMargin: '500px 500px' }); // زيادة مساحة التتبع لضمان سلاسة السحب في كل الاتجاهات
+            }, { root: container, rootMargin: ((navigator.deviceMemory || 4) <= 2 ? '140px 120px' : '260px 220px') }); // زيادة مساحة التتبع لضمان سلاسة السحب في كل الاتجاهات
 
             for (let index = 0; index < pageOrder.length; index++) {
                 const actualPageNum = pageOrder[index];
@@ -1336,6 +1786,12 @@
             applyViewModeUI();
             if (typeof reorderDOMPages === 'function') reorderDOMPages();
             if (typeof goToPage === 'function') goToPage(currentPage);
+            requestAnimationFrame(() => {
+                applyZoomTransform();
+                const c = document.getElementById('viewer-container');
+                const state = savedPageViewState[currentPage] || savedPageViewState[String(currentPage)] || {};
+                if (c) { c.scrollLeft = Number(state.scrollLeft || 0); c.scrollTop = Number(state.scrollTop || 0); }
+            });
         }
 
         async function renderPageContent(pageWrapper, actualPageNum, displayIndex) {
@@ -1344,7 +1800,11 @@
 
             const page = await pdfDoc.getPage(actualPageNum);
             const viewport = page.getViewport({ scale: baseScale });
-            const hdViewport = page.getViewport({ scale: baseScale * renderQualityScale });
+            let quality = renderQualityScale;
+            const maxPixels = ((navigator.deviceMemory || 4) <= 2 ? 1900000 : 3200000);
+            const wantedPixels = viewport.width * viewport.height * quality * quality;
+            if (wantedPixels > maxPixels) quality = Math.sqrt(maxPixels / (viewport.width * viewport.height));
+            const hdViewport = page.getViewport({ scale: baseScale * quality });
 
             pageWrapper.dataset.baseWidth = viewport.width;
             pageWrapper.dataset.baseHeight = viewport.height;
@@ -1357,8 +1817,10 @@
                 pdfCanvas.className = 'pdf-render';
                 pageWrapper.appendChild(pdfCanvas);
             }
-            pdfCanvas.width = hdViewport.width;
-            pdfCanvas.height = hdViewport.height;
+            pdfCanvas.width = Math.ceil(hdViewport.width);
+            pdfCanvas.height = Math.ceil(hdViewport.height);
+            pdfCanvas.style.width = '100%';
+            pdfCanvas.style.height = '100%';
 
             let textLayerDiv = pageWrapper.querySelector('.textLayer');
             if (!textLayerDiv) {
@@ -1375,8 +1837,10 @@
                 drawCanvas.className = 'draw-canvas';
                 pageWrapper.appendChild(drawCanvas);
             }
-            drawCanvas.width = hdViewport.width;
-            drawCanvas.height = hdViewport.height;
+            drawCanvas.width = Math.ceil(hdViewport.width);
+            drawCanvas.height = Math.ceil(hdViewport.height);
+            drawCanvas.style.width = '100%';
+            drawCanvas.style.height = '100%';
 
             page.render({ 
                 canvasContext: pdfCanvas.getContext('2d'), 
@@ -1389,6 +1853,12 @@
                     viewport: viewport,
                     textDivs: []
                 });
+                // Release PDF.js page resources after the visible render is complete.
+                page.cleanup?.();
+            }).catch(err => {
+                console.error('Page render error:', err);
+                pageWrapper.dataset.rendered = "false";
+                renderedPages.delete(displayIndex);
             });
 
             if (typeof restorePageDrawings === 'function') restorePageDrawings(actualPageNum, drawCanvas);
@@ -1449,18 +1919,111 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
                     if (entry.isIntersecting) {
                         obs.disconnect();
                         if (!pdfDoc) return;
-                        const page = await pdfDoc.getPage(actualPageNum);
-                        const thumbCanvas = document.createElement('canvas');
-                        const thumbViewport = page.getViewport({ scale: 0.12 });
-                        thumbCanvas.width = thumbViewport.width;
-                        thumbCanvas.height = thumbViewport.height;
-                        thumbItem.insertBefore(thumbCanvas, pageNumBadge);
-                        page.render({ canvasContext: thumbCanvas.getContext('2d'), viewport: thumbViewport });
+                        try {
+                            const page = await pdfDoc.getPage(actualPageNum);
+                            const thumbViewport = page.getViewport({ scale: THUMB_SCALE });
+                            const thumbCanvas = document.createElement('canvas');
+                            thumbCanvas.width = Math.max(1, Math.ceil(thumbViewport.width));
+                            thumbCanvas.height = Math.max(1, Math.ceil(thumbViewport.height));
+                            thumbCanvas.style.height = '60px';
+                            thumbCanvas.style.width = 'auto';
+                            thumbCanvas.style.position = 'relative';
+                            thumbItem.insertBefore(thumbCanvas, pageNumBadge);
+
+                            const overlayCanvas = document.createElement('canvas');
+                            overlayCanvas.className = 'thumb-annotation-canvas';
+                            overlayCanvas.width = thumbCanvas.width;
+                            overlayCanvas.height = thumbCanvas.height;
+                            overlayCanvas.style.height = '60px';
+                            overlayCanvas.style.width = 'auto';
+                            thumbItem.insertBefore(overlayCanvas, pageNumBadge);
+
+                            await page.render({
+                                canvasContext: thumbCanvas.getContext('2d', { alpha: false }),
+                                viewport: thumbViewport
+                            }).promise;
+
+                            renderThumbnailAnnotations(displayIndex, actualPageNum, thumbCanvas, overlayCanvas);
+                            page.cleanup?.();
+                        } catch (err) {
+                            console.error('Thumbnail render error:', err);
+                        }
                     }
                 });
             }, { root: thumbsContainer, rootMargin: '100px' });
-            
+
             thumbObserver.observe(thumbItem);
+        }
+
+        function getThumbnailCanvases(displayIndex) {
+            const thumb = document.querySelector(`.thumb-item[data-page-num="${displayIndex}"]`);
+            if (!thumb) return null;
+            return {
+                pdf: thumb.querySelector('canvas:not(.thumb-annotation-canvas)'),
+                overlay: thumb.querySelector('canvas.thumb-annotation-canvas')
+            };
+        }
+
+        function loadThumbnailImage(src) {
+            return new Promise(resolve => {
+                if (!src) return resolve(null);
+                const img = new Image();
+                img.onload = () => resolve(img);
+                img.onerror = () => resolve(null);
+                img.src = src;
+            });
+        }
+
+        async function renderThumbnailAnnotations(displayIndex, actualPageNum, pdfCanvas = null, overlayCanvas = null) {
+            const canvases = overlayCanvas ? { pdf: pdfCanvas, overlay: overlayCanvas } : getThumbnailCanvases(displayIndex);
+            if (!canvases?.overlay) return;
+
+            const canvas = canvases.overlay;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const baseW = parseFloat(document.querySelector(`.page-wrapper[data-page-num="${displayIndex}"]`)?.dataset.baseWidth) || (canvas.width / THUMB_SCALE);
+            const scale = canvas.width / baseW;
+
+            const drawing = currentDrawings[actualPageNum];
+            if (drawing) {
+                const img = await loadThumbnailImage(drawing);
+                if (img) ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            }
+
+            const images = currentImages[actualPageNum] || [];
+            for (const item of images) {
+                const img = await loadThumbnailImage(item.src);
+                if (!img) continue;
+                ctx.drawImage(img,
+                    (Number(item.x) || 0) * scale,
+                    (Number(item.y) || 0) * scale,
+                    Math.max(1, (Number(item.w) || 150) * scale),
+                    Math.max(1, (Number(item.h) || 150) * scale)
+                );
+            }
+
+            const texts = currentTexts[actualPageNum] || [];
+            ctx.save();
+            ctx.textBaseline = 'top';
+            for (const item of texts) {
+                if (!item?.text) continue;
+                const fontSize = Math.max(4, (Number(item.fontSize) || 18) * scale);
+                ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
+                ctx.fillStyle = item.color || activeColor || '#000000';
+                const lines = String(item.text).split(/\r?\n/);
+                lines.forEach((line, index) => {
+                    ctx.fillText(line, (Number(item.x) || 0) * scale, ((Number(item.y) || 0) * scale) + index * fontSize * 1.3);
+                });
+            }
+            ctx.restore();
+        }
+
+        function refreshThumbnail(displayIndex, actualPageNum = Number(pageOrder[displayIndex - 1])) {
+            const canvases = getThumbnailCanvases(displayIndex);
+            if (!canvases?.overlay) return;
+            renderThumbnailAnnotations(displayIndex, actualPageNum, canvases.pdf, canvases.overlay).catch(err => console.error('Thumbnail update error:', err));
         }
 
         function toggleEditMode(enable) {
@@ -1558,57 +2121,142 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
             });
         }
 
-        async function savePageOrder() {
-            if (typeof updateAutosaveIndicator === 'function') updateAutosaveIndicator('saving');
-            return new Promise((resolve) => {
-                if (!db || !currentFileId) return resolve();
-                const tx = db.transaction("files", "readwrite");
-                const store = tx.objectStore("files");
-                store.get(currentFileId).onsuccess = e => {
-                    const data = e.target.result;
-                    if (data) {
-                        data.pageOrder = [...pageOrder];
-                        store.put(data).onsuccess = () => {
-                            if (typeof updateAutosaveIndicator === 'function') updateAutosaveIndicator('saved');
-                            resolve();
-                        };
-                    } else {
-                        resolve();
-                    }
-                };
+        async function saveDocumentSettings() {
+            if (!db || !currentFileId) return;
+            const container = document.getElementById('viewer-container');
+            const saved = savedPageViewState || {};
+            saved.currentPage = currentPage;
+            saved.viewMode = viewMode;
+            saved.globalPageStyle = globalPageStyle;
+            const state = saved[currentPage] || {};
+            state.zoomScale = zoomScale;
+            if (container) {
+                state.scrollLeft = container.scrollLeft;
+                state.scrollTop = container.scrollTop;
+            }
+            state.timestamp = Date.now();
+            saved[currentPage] = state;
+            savedPageViewState = saved;
+
+            updateAutosaveIndicator('saving');
+            await putSettings({
+                fileId: currentFileId,
+                pageOrder: [...pageOrder],
+                bookmarks: currentBookmarks,
+                viewMode,
+                globalPageStyle,
+                pageViewState: savedPageViewState
             });
+            updateAutosaveIndicator('saved');
+        }
+
+        function scheduleDocumentSettingsSave() {
+            clearTimeout(viewSaveTimeout);
+            viewSaveTimeout = setTimeout(() => {
+                saveDocumentSettings().catch(err => console.error('View state save error:', err));
+            }, ((navigator.deviceMemory || 4) <= 2 ? 650 : 350));
+        }
+
+        async function savePageOrder() {
+            await saveDocumentSettings();
+        }
+
+        async function deleteAllPageStates(fileId) {
+            const states = await getAllPageStates(fileId).catch(() => []);
+            if (!states.length) return;
+            const tx = db.transaction('pages', 'readwrite');
+            const store = tx.objectStore('pages');
+            states.forEach(state => store.delete([fileId, Number(state.page)]));
+            await new Promise((resolve, reject) => {
+                tx.oncomplete = resolve;
+                tx.onerror = e => reject(e.target.error);
+                tx.onabort = e => reject(e.target.error || new Error('Page-state delete aborted'));
+            });
+        }
+
+        async function replaceAllPageStates(fileId) {
+            await deleteAllPageStates(fileId);
+            await saveAllLoadedPageStates();
+        }
+
+        async function saveAllLoadedPageStates() {
+            const tasks = [];
+            for (const displayIndex of Object.keys(currentDrawings)) {
+                const actualPage = Number(displayIndex);
+                tasks.push(putPageState({
+                    fileId: currentFileId,
+                    page: actualPage,
+                    drawings: currentDrawings[actualPage] || null,
+                    texts: currentTexts[actualPage] || [],
+                    images: currentImages[actualPage] || []
+                }));
+            }
+            for (const displayIndex of Object.keys(currentTexts)) {
+                const actualPage = Number(displayIndex);
+                if (currentDrawings[actualPage] !== undefined) continue;
+                tasks.push(putPageState({
+                    fileId: currentFileId,
+                    page: actualPage,
+                    drawings: null,
+                    texts: currentTexts[actualPage] || [],
+                    images: currentImages[actualPage] || []
+                }));
+            }
+            for (const displayIndex of Object.keys(currentImages)) {
+                const actualPage = Number(displayIndex);
+                if (currentDrawings[actualPage] !== undefined || currentTexts[actualPage] !== undefined) continue;
+                tasks.push(putPageState({
+                    fileId: currentFileId,
+                    page: actualPage,
+                    drawings: null,
+                    texts: [],
+                    images: currentImages[actualPage] || []
+                }));
+            }
+            await Promise.all(tasks);
         }
 
         function goToPage(pageNum) {
             if (!pdfDoc || pageNum < 1 || pageNum > pageOrder.length) return;
-            if (typeof savePageData === 'function') savePageData(currentPage);
-            currentPage = pageNum;
-            
-            const targetWrapper = document.querySelector(`.page-wrapper[data-page-num="${pageNum}"]`);
-            if (targetWrapper) {
-                if (viewMode === 'vertical') {
-                    targetWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                } else {
-                    updatePageDisplay();
-                }
-            }
-            
-            const bookmarkBtn = document.getElementById('bookmarkToggleBtn');
-            if (bookmarkBtn) {
-                if (currentBookmarks[currentPage]) bookmarkBtn.classList.add('active');
-                else bookmarkBtn.classList.remove('active');
+            const previousPage = currentPage;
+            if (previousPage !== pageNum) {
+                savePageDataNow(previousPage).catch(() => {});
+                currentPage = pageNum;
             }
 
-            const thumbs = document.querySelectorAll('.thumb-item');
-            thumbs.forEach((thumb) => {
-                const pNum = parseInt(thumb.dataset.pageNum);
-                if (pNum === currentPage) {
-                    thumb.classList.add('active');
-                    thumb.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+            const container = document.getElementById('viewer-container');
+            const targetWrapper = document.querySelector(`.page-wrapper[data-page-num="${pageNum}"]`);
+            const saved = savedPageViewState[pageNum] || savedPageViewState[String(pageNum)] || {};
+
+            if (targetWrapper && container) {
+                if (viewMode === 'vertical') {
+                    targetWrapper.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
                 } else {
-                    thumb.classList.remove('active');
+                    updatePageDisplay();
+                    requestAnimationFrame(() => {
+                        container.scrollLeft = Number(saved.scrollLeft || 0);
+                        container.scrollTop = Number(saved.scrollTop || 0);
+                    });
                 }
+            }
+
+            const bookmarkBtn = document.getElementById('bookmarkToggleBtn');
+            if (bookmarkBtn) bookmarkBtn.classList.toggle('active', !!currentBookmarks[currentPage]);
+
+            const thumbs = document.querySelectorAll('.thumb-item');
+            thumbs.forEach(thumb => {
+                const pNum = parseInt(thumb.dataset.pageNum);
+                const active = pNum === currentPage;
+                thumb.classList.toggle('active', active);
+                if (active) thumb.scrollIntoView({ behavior: ((navigator.deviceMemory || 4) <= 2 ? 'auto' : 'smooth'), block: 'nearest', inline: 'center' });
             });
+
+            const pageState = savedPageViewState[currentPage] || {};
+            if (Number.isFinite(Number(pageState.zoomScale))) {
+                zoomScale = Math.max(0.5, Math.min(6.0, Number(pageState.zoomScale)));
+                applyZoomTransform();
+            }
+            scheduleDocumentSettingsSave();
         }
 
         function changePage(dir) {
@@ -1617,135 +2265,117 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
 
         function updatePageDisplay() {
             if (viewMode !== 'horizontal') return;
-
             const wrappers = document.querySelectorAll('.page-wrapper');
-            wrappers.forEach((wrapper) => {
+            wrappers.forEach(wrapper => {
                 const pNum = parseInt(wrapper.dataset.pageNum);
-                if (pNum === currentPage) {
-                    wrapper.classList.add('active');
-                } else {
-                    wrapper.classList.remove('active');
-                }
+                wrapper.classList.toggle('active', pNum === currentPage);
             });
         }
 
-        /* الزوم والتحريك الحر للوصول لكل ركن ومكان في الصفحة بكامل الحرية */
+        /* Pinch/zoom: always anchors on the point between the two fingers. */
         let initialDistance = null;
-        let pinchCenter = { x: 0, y: 0 };
+        let pinchStartZoom = 1;
+        let pinchPoint = { x: 0, y: 0 };
+        let pinchMidClient = { x: 0, y: 0 };
         const viewer = document.getElementById('viewer-container');
         const editorScreen = document.getElementById('editor-screen');
-
+        const isLowPowerDevice = (navigator.deviceMemory || 4) <= 2;
         const startTouch = () => { if (currentTool && editorScreen) editorScreen.classList.add('is-touching'); };
         const endTouch = () => { if (editorScreen) editorScreen.classList.remove('is-touching'); };
+        const touchDistance = (a,b) => Math.hypot(a.clientX-b.clientX,a.clientY-b.clientY);
+        const touchMid = (a,b) => ({x:(a.clientX+b.clientX)/2,y:(a.clientY+b.clientY)/2});
 
-        if (viewer) {
-            viewer.addEventListener('pointerdown', startTouch);
-            viewer.addEventListener('pointerup', endTouch);
-            viewer.addEventListener('pointercancel', endTouch);
-
-            viewer.addEventListener('touchstart', e => {
-                if (e.touches.length === 2) {
-                    initialDistance = Math.hypot(
-                        e.touches[0].clientX - e.touches[1].clientX,
-                        e.touches[0].clientY - e.touches[1].clientY
-                    );
-
-                    const rect = viewer.getBoundingClientRect();
-                    pinchCenter = {
-                        x: (e.touches[0].clientX + e.touches[1].clientX) / 2 - rect.left + viewer.scrollLeft,
-                        y: (e.touches[0].clientY + e.touches[1].clientY) / 2 - rect.top + viewer.scrollTop
-                    };
-                }
-            }, { passive: true });
-
-            viewer.addEventListener('touchmove', e => {
-                if (e.touches.length === 2 && initialDistance) {
-                    e.preventDefault();
-
-                    const currentDistance = Math.hypot(
-                        e.touches[0].clientX - e.touches[1].clientX,
-                        e.touches[0].clientY - e.touches[1].clientY
-                    );
-                    
-                    const factor = currentDistance / initialDistance;
-                    const prevScale = zoomScale;
-                    const newScale = Math.max(0.6, Math.min(4.0, prevScale * factor));
-                    
-                    if (newScale !== prevScale) {
-                        const scaleRatio = newScale / prevScale;
-                        zoomScale = newScale;
-
-                        requestAnimationFrame(() => {
-                            applyZoomTransform();
-                            viewer.scrollLeft = pinchCenter.x * scaleRatio - (pinchCenter.x - viewer.scrollLeft);
-                            viewer.scrollTop = pinchCenter.y * scaleRatio - (pinchCenter.y - viewer.scrollTop);
-                        });
-                    }
-
-                    initialDistance = currentDistance;
-                }
-            }, { passive: false });
-
-            viewer.addEventListener('touchend', e => {
-                if (e.touches.length < 2) initialDistance = null;
-                if (e.touches.length === 0) endTouch();
-            }, { passive: true });
+        function applyZoomAround(newScale, clientX, clientY) {
+            if (!viewer || !pdfDoc) return;
+            const rect = viewer.getBoundingClientRect();
+            const old = zoomScale;
+            const z = Math.max(0.5, Math.min(6.0, newScale));
+            if (Math.abs(z-old)<0.001) return;
+            const lx = clientX-rect.left, ly=clientY-rect.top;
+            const logicalX=(viewer.scrollLeft+lx)/old;
+            const logicalY=(viewer.scrollTop+ly)/old;
+            zoomScale=z;
+            applyZoomTransform();
+            requestAnimationFrame(()=>{
+                viewer.scrollLeft=Math.max(0,logicalX*z-lx);
+                viewer.scrollTop=Math.max(0,logicalY*z-ly);
+                scheduleDocumentSettingsSave();
+                updateZoomLabel();
+            });
         }
 
-        /*
-         * تغيير الحجم الحقيقي للصفحة بدل transform فقط.
-         * هذا يجعل overflow يحسب العرض والارتفاع بعد الزوم فعلياً،
-         * وبالتالي يمكن التحرك يمين/شمال وفوق/تحت بحرية.
-         */
-        /*
-         * على الكمبيوتر:
-         * Ctrl + Wheel أو Cmd + Wheel = Zoom حول مكان المؤشر.
-         * Wheel العادي يظل Scroll طبيعي في كل الاتجاهات.
-         */
         if (viewer) {
-            viewer.addEventListener('wheel', e => {
-                if (!(e.ctrlKey || e.metaKey) || !pdfDoc) return;
-
+            viewer.addEventListener('touchstart', e => {
+                if (e.touches.length!==2) return;
                 e.preventDefault();
+                e.stopImmediatePropagation();
+                isDrawing=false;
+                const d=touchDistance(e.touches[0],e.touches[1]);
+                const m=touchMid(e.touches[0],e.touches[1]);
+                const rect=viewer.getBoundingClientRect();
+                initialDistance=Math.max(1,d);
+                pinchStartZoom=zoomScale;
+                pinchMidClient=m;
+                pinchPoint={x:(viewer.scrollLeft+(m.x-rect.left))/zoomScale,y:(viewer.scrollTop+(m.y-rect.top))/zoomScale};
+            },{passive:false,capture:true});
 
-                const rect = viewer.getBoundingClientRect();
-                const cursorX = e.clientX - rect.left + viewer.scrollLeft;
-                const cursorY = e.clientY - rect.top + viewer.scrollTop;
-
-                const oldScale = zoomScale;
-                const factor = Math.exp(-e.deltaY * 0.0025);
-                const newScale = Math.max(0.6, Math.min(4.0, oldScale * factor));
-
-                if (newScale === oldScale) return;
-
-                zoomScale = newScale;
+            viewer.addEventListener('touchmove', e => {
+                if (e.touches.length!==2 || initialDistance===null) return;
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                const d=touchDistance(e.touches[0],e.touches[1]);
+                const m=touchMid(e.touches[0],e.touches[1]);
+                const z=Math.max(0.5,Math.min(6.0,pinchStartZoom*(d/initialDistance)));
+                zoomScale=z;
                 applyZoomTransform();
+                const rect=viewer.getBoundingClientRect();
+                viewer.scrollLeft=Math.max(0,pinchPoint.x*z-(m.x-rect.left));
+                viewer.scrollTop=Math.max(0,pinchPoint.y*z-(m.y-rect.top));
+                pinchMidClient=m;
+                updateZoomLabel();
+            },{passive:false,capture:true});
 
-                const ratio = newScale / oldScale;
+            const endPinch=()=>{ if(initialDistance!==null){ initialDistance=null; scheduleDocumentSettingsSave(); } };
+            viewer.addEventListener('touchend', e => { e.stopImmediatePropagation(); endPinch(); },{passive:true,capture:true});
+            viewer.addEventListener('touchcancel', e => { e.stopImmediatePropagation(); endPinch(); },{passive:true,capture:true});
 
-                requestAnimationFrame(() => {
-                    viewer.scrollLeft = Math.max(
-                        0,
-                        cursorX * ratio - (e.clientX - rect.left)
-                    );
-                    viewer.scrollTop = Math.max(
-                        0,
-                        cursorY * ratio - (e.clientY - rect.top)
-                    );
-                });
-            }, { passive: false });
+            viewer.addEventListener('wheel', e => {
+                if (!(e.ctrlKey||e.metaKey)||!pdfDoc) return;
+                e.preventDefault();
+                e.stopImmediatePropagation();
+                applyZoomAround(zoomScale*Math.exp(-e.deltaY*0.0025),e.clientX,e.clientY);
+            },{passive:false,capture:true});
+
+            let scrollRaf=null;
+            viewer.addEventListener('scroll',()=>{
+                if(scrollRaf)return;
+                scrollRaf=requestAnimationFrame(()=>{scrollRaf=null;scheduleDocumentSettingsSave();});
+            },{passive:true});
         }
 
         function applyZoomTransform() {
-            document.querySelectorAll('.page-wrapper').forEach(w => {
-                const baseW = parseFloat(w.dataset.baseWidth) || 600;
-                const baseH = parseFloat(w.dataset.baseHeight) || 800;
+            document.querySelectorAll('.page-wrapper').forEach(w=>{
+                const baseW=parseFloat(w.dataset.baseWidth)||600;
+                const baseH=parseFloat(w.dataset.baseHeight)||800;
+                w.style.width=(baseW*zoomScale)+'px';
+                w.style.height=(baseH*zoomScale)+'px';
+                w.style.flex='0 0 auto';
 
-                w.style.width = (baseW * zoomScale) + 'px';
-                w.style.height = (baseH * zoomScale) + 'px';
-                w.style.flex = '0 0 auto';
+                // Keep text/images attached to the same document coordinates while keeping their own size unchanged.
+                w.querySelectorAll('.text-node-wrapper,.img-node').forEach(node=>{
+                    const x=parseFloat(node.dataset.baseX)||0;
+                    const y=parseFloat(node.dataset.baseY)||0;
+                    node.style.left=(x*zoomScale)+'px';
+                    node.style.top=(y*zoomScale)+'px';
+                });
             });
+            updateZoomLabel();
         }
+        function updateZoomLabel(){const e=document.getElementById('zoomLabel');if(e)e.textContent=Math.round(zoomScale*100)+'%';}
+        function zoomByFactor(f){ applyZoomAround(zoomScale*f,innerWidth/2,innerHeight/2); }
+        function fitWidth(){const w=document.querySelector(`.page-wrapper[data-page-num="${currentPage}"]`);if(!w)return;const bw=+(w.dataset.baseWidth||600);applyZoomAround((viewer.clientWidth-40)/bw,viewer.clientWidth/2,viewer.clientHeight/2);}
+        function fitPage(){const w=document.querySelector(`.page-wrapper[data-page-num="${currentPage}"]`);if(!w)return;const bw=+(w.dataset.baseWidth||600),bh=+(w.dataset.baseHeight||800);applyZoomAround(Math.min((viewer.clientWidth-40)/bw,(viewer.clientHeight-40)/bh),viewer.clientWidth/2,viewer.clientHeight/2);}
+        updateZoomLabel();
 
         function toggleTool(toolName) {
             const bgPanel = document.getElementById('background-panel');
@@ -1770,6 +2400,8 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
             if (currentTool === 'pen') document.getElementById('penBtn')?.classList.add('active');
             if (currentTool === 'text') document.getElementById('textBtn')?.classList.add('active');
             if (currentTool === 'eraser') document.getElementById('eraserBtn')?.classList.add('active');
+            if (currentTool === 'highlighter') document.getElementById('highlighterBtn')?.classList.add('active');
+            if (currentTool === 'select') document.getElementById('selectBtn')?.classList.add('active');
         }
 
         function updateCanvasPointerEvents() {
@@ -1810,7 +2442,7 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
         function updateToolSize(val) {
             const badge = document.getElementById('sizeValBadge');
             if (badge) badge.innerText = val;
-            if (currentTool) {
+            if (currentTool && currentTool !== 'select') {
                 toolSizes[currentTool] = parseInt(val);
                 if (currentTool === 'text' && activeTextNode) {
                     activeTextNode.style.fontSize = val + 'px';
@@ -1823,232 +2455,130 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
         const eraserCursor = document.getElementById('eraser-cursor');
 
         function initDrawingEvents(canvas, displayIndex, actualPageNum) {
-            const ctx = canvas.getContext('2d');
-
-            function getPos(e) {
-                const rect = canvas.getBoundingClientRect();
-                return {
-                    x: (e.clientX - rect.left) * (canvas.width / rect.width),
-                    y: (e.clientY - rect.top) * (canvas.height / rect.height)
-                };
-            }
-
-            canvas.onpointerdown = e => {
-                if (!currentTool) return;
+            const ctx=canvas.getContext('2d',{alpha:true,desynchronized:true});
+            const getPos=e=>{const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*(canvas.width/r.width),y:(e.clientY-r.top)*(canvas.height/r.height)}};
+            let points=[],drawing=false;
+            const finish=()=>{
+                if(!drawing)return;
+                drawing=false;points=[];ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+                if(eraserCursor)eraserCursor.style.display='none';
+                savePageData(displayIndex);
+            };
+            canvas.onpointerdown=e=>{
+                if(!currentTool)return;
                 startTouch();
-
-                if (currentTool === 'text') {
-                    const rect = canvas.parentElement.getBoundingClientRect();
-                    const fontSize = toolSizes['text'] || 18;
-                    const baseW = parseFloat(canvas.parentElement.dataset.baseWidth) || 600;
-                    const baseH = parseFloat(canvas.parentElement.dataset.baseHeight) || 800;
-                    
-                    const clickX = ((e.clientX - rect.left) / rect.width) * baseW;
-                    const clickY = ((e.clientY - rect.top) / rect.height) * baseH;
-                    
-                    if (typeof createTextNode === 'function') {
-                        createTextNode(clickX, clickY, "Type here...", activeColor, canvas.parentElement, displayIndex, fontSize);
-                        if (typeof savePageData === 'function') savePageData(displayIndex);
-                    }
-                    return;
+                if(currentTool==='text'){
+                    const rect=canvas.parentElement.getBoundingClientRect();const fontSize=toolSizes.text||18;const bw=+(canvas.parentElement.dataset.baseWidth||600),bh=+(canvas.parentElement.dataset.baseHeight||800);
+                    createTextNode(((e.clientX-rect.left)/rect.width)*bw,((e.clientY-rect.top)/rect.height)*bh,'Type here...',activeColor,canvas.parentElement,displayIndex,fontSize);savePageData(displayIndex);return;
                 }
-                
-                isDrawing = true;
-                canvas.setPointerCapture(e.pointerId);
-
-                historyStack.push({ pageNum: displayIndex, dataUrl: canvas.toDataURL() });
-                if (historyStack.length > 20) historyStack.shift();
-
-                const pos = getPos(e);
-                strokePoints = [pos];
-
-                const currentSize = toolSizes[currentTool] * (baseScale * renderQualityScale);
-
-                if (currentTool === 'eraser') {
-                    ctx.globalCompositeOperation = 'destination-out';
-                    ctx.lineWidth = currentSize;
-                    ctx.lineCap = 'round';
-                    ctx.lineJoin = 'round';
-
-                    if (eraserCursor) {
-                        const displaySize = toolSizes['eraser'] * zoomScale;
-                        eraserCursor.style.width = displaySize + 'px';
-                        eraserCursor.style.height = displaySize + 'px';
-                        eraserCursor.style.left = e.clientX + 'px';
-                        eraserCursor.style.top = e.clientY + 'px';
-                        eraserCursor.style.display = 'block';
-                    }
-                } else {
-                    ctx.globalCompositeOperation = 'source-over';
-                    ctx.strokeStyle = activeColor;
-                    ctx.lineWidth = currentSize;
-                    ctx.lineCap = 'round';
-                    ctx.lineJoin = 'round';
-                    
-                    ctx.beginPath();
-                    ctx.arc(pos.x, pos.y, currentSize / 2, 0, Math.PI * 2);
-                    ctx.fillStyle = activeColor;
-                    ctx.fill();
+                if(!['pen','eraser','highlighter'].includes(currentTool))return;
+                redoStack=[];
+                historyStack.push({pageNum:displayIndex,dataUrl:canvas.toDataURL('image/png')});if(historyStack.length>12)historyStack.shift();
+                drawing=true;canvas.setPointerCapture?.(e.pointerId);const p=getPos(e);points=[p];
+                const factor=baseScale*renderQualityScale;const size=(toolSizes[currentTool]||4)*factor;
+                ctx.lineWidth=size;ctx.lineCap='round';ctx.lineJoin='round';
+                if(currentTool==='eraser'){
+                    ctx.globalCompositeOperation='destination-out';ctx.globalAlpha=1;
+                    if(eraserCursor){const ds=toolSizes.eraser*zoomScale;eraserCursor.style.width=ds+'px';eraserCursor.style.height=ds+'px';eraserCursor.style.left=e.clientX+'px';eraserCursor.style.top=e.clientY+'px';eraserCursor.style.display='block';}
+                }else{
+                    ctx.globalCompositeOperation='source-over';ctx.strokeStyle=activeColor;ctx.globalAlpha=currentTool==='highlighter'?0.28:1;
                 }
+                ctx.beginPath();ctx.arc(p.x,p.y,size/2,0,Math.PI*2);ctx.fillStyle=activeColor;ctx.fill();
             };
-
-            canvas.onpointermove = e => {
-                if (currentTool === 'eraser' && isDrawing && eraserCursor) {
-                    eraserCursor.style.left = e.clientX + 'px';
-                    eraserCursor.style.top = e.clientY + 'px';
-                }
-
-                if (!isDrawing || !currentTool) return;
-                const pos = getPos(e);
-
-                if (currentTool === 'pen') {
-                    strokePoints.push(pos);
-                    
-                    if (strokePoints.length >= 3) {
-                        const len = strokePoints.length;
-                        const p0 = strokePoints[len - 3];
-                        const p1 = strokePoints[len - 2];
-                        const p2 = strokePoints[len - 1];
-
-                        const mid1 = { x: (p0.x + p1.x) / 2, y: (p0.y + p1.y) / 2 };
-                        const mid2 = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
-
-                        ctx.beginPath();
-                        ctx.moveTo(mid1.x, mid1.y);
-                        ctx.quadraticCurveTo(p1.x, p1.y, mid2.x, mid2.y);
-                        ctx.stroke();
-                    } else if (strokePoints.length === 2) {
-                        ctx.beginPath();
-                        ctx.moveTo(strokePoints[0].x, strokePoints[0].y);
-                        ctx.lineTo(strokePoints[1].x, strokePoints[1].y);
-                        ctx.stroke();
-                    }
-                } else if (currentTool === 'eraser') {
-                    const lastPt = strokePoints[strokePoints.length - 1] || pos;
-                    ctx.beginPath();
-                    ctx.moveTo(lastPt.x, lastPt.y);
-                    ctx.lineTo(pos.x, pos.y);
-                    ctx.stroke();
-                    strokePoints.push(pos);
-                }
+            canvas.onpointermove=e=>{
+                if(currentTool==='eraser'&&drawing&&eraserCursor){eraserCursor.style.left=e.clientX+'px';eraserCursor.style.top=e.clientY+'px';}
+                if(!drawing)return;const p=getPos(e),last=points[points.length-1];if(!last)return;if(Math.hypot(p.x-last.x,p.y-last.y)<1.2)return;
+                if(currentTool==='pen'||currentTool==='highlighter'){
+                    const mid={x:(last.x+p.x)/2,y:(last.y+p.y)/2};ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.quadraticCurveTo(last.x,last.y,mid.x,mid.y);ctx.stroke();
+                }else if(currentTool==='eraser'){ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();}
+                points.push(p);
             };
-
-            canvas.onpointerup = () => {
-                endTouch();
-                if (eraserCursor) eraserCursor.style.display = 'none';
-                if (isDrawing) {
-                    isDrawing = false;
-                    strokePoints = [];
-                    if (typeof savePageData === 'function') savePageData(displayIndex);
-                }
-            };
-
-            canvas.onpointercancel = () => {
-                endTouch();
-                if (eraserCursor) eraserCursor.style.display = 'none';
-                isDrawing = false;
-                strokePoints = [];
-            };
+            canvas.onpointerup=finish;canvas.onpointercancel=finish;
         }
 
-        function undo() {
-            if (historyStack.length > 0) {
-                const { pageNum, dataUrl } = historyStack.pop();
-                const wrapper = document.querySelector(`.page-wrapper[data-page-num="${pageNum}"]`);
-                if (!wrapper) return;
-                const drawCanvas = wrapper.querySelector('.draw-canvas');
-                if (!drawCanvas) return;
-                const drawCtx = drawCanvas.getContext('2d');
+        let redoStack = [];
+        function restoreCanvasSnapshot(item, targetStack, pushCurrent=true){
+            const wrapper=document.querySelector(`.page-wrapper[data-page-num="${item.pageNum}"]`);if(!wrapper)return;
+            const c=wrapper.querySelector('.draw-canvas');if(!c)return;
+            if(pushCurrent)targetStack.push({pageNum:item.pageNum,dataUrl:c.toDataURL('image/png')});
+            const img=new Image();img.onload=()=>{const ctx=c.getContext('2d');ctx.clearRect(0,0,c.width,c.height);ctx.drawImage(img,0,0);savePageData(item.pageNum);};img.src=item.dataUrl;
+        }
+        function undo(){
+            if(!historyStack.length)return;
+            const item=historyStack.pop();
+            restoreCanvasSnapshot(item,redoStack,true);
+        }
+        function redo(){
+            if(!redoStack.length)return;
+            const item=redoStack.pop();
+            restoreCanvasSnapshot(item,historyStack,true);
+        }
 
-                const img = new Image();
-                img.onload = () => {
-                    drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
-                    drawCtx.drawImage(img, 0, 0);
-                    if (typeof savePageData === 'function') savePageData(pageNum);
-                };
-                img.src = dataUrl;
+        async function savePageDataNow(displayIndex) {
+            if (!currentFileId || !db || !pdfDoc) return;
+            const wrapper = document.querySelector(`.page-wrapper[data-page-num="${displayIndex}"]`);
+            const actualPage = wrapper ? Number(wrapper.dataset.actualPage) : Number(pageOrder[displayIndex - 1]);
+            if (!actualPage) return;
+
+            try {
+                if (wrapper) {
+                    const drawCanvas = wrapper.querySelector('.draw-canvas');
+                    if (drawCanvas) currentDrawings[actualPage] = drawCanvas.toDataURL('image/png');
+
+                    const textsOnPage = [];
+                    wrapper.querySelectorAll('.text-node-wrapper').forEach(wrapperNode => {
+                        const node = wrapperNode.querySelector('.text-node');
+                        if (node) {
+                            textsOnPage.push({
+                                text: node.innerText,
+                                x: parseFloat(wrapperNode.dataset.baseX) || 0,
+                                y: parseFloat(wrapperNode.dataset.baseY) || 0,
+                                color: node.style.color || activeColor,
+                                fontSize: parseFloat(node.style.fontSize) || 18
+                            });
+                        }
+                    });
+                    currentTexts[actualPage] = textsOnPage;
+
+                    const imagesOnPage = [];
+                    wrapper.querySelectorAll('.img-node').forEach(node => {
+                        const img = node.querySelector('img');
+                        if (img) {
+                            imagesOnPage.push({
+                                src: img.src,
+                                x: parseFloat(node.dataset.baseX) || 0,
+                                y: parseFloat(node.dataset.baseY) || 0,
+                                w: parseFloat(node.style.width) || 150,
+                                h: parseFloat(node.style.height) || 150
+                            });
+                        }
+                    });
+                    currentImages[actualPage] = imagesOnPage;
+                }
+
+                updateAutosaveIndicator('saving');
+                await putPageState({
+                    fileId: currentFileId,
+                    page: actualPage,
+                    drawings: currentDrawings[actualPage] || null,
+                    texts: currentTexts[actualPage] || [],
+                    images: currentImages[actualPage] || []
+                });
+                await saveDocumentSettings();
+                refreshThumbnail(displayIndex, actualPage);
+                updateAutosaveIndicator('saved');
+            } catch (err) {
+                console.error('Page save error:', err);
+                throw err;
             }
-        }
-
-        function savePageDataNow(displayIndex) {
-            return new Promise((resolve, reject) => {
-                try {
-                    clearTimeout(saveTimeout);
-                    const wrapper = document.querySelector(`.page-wrapper[data-page-num="${displayIndex}"]`);
-                    if (wrapper) {
-                        const actualPage = wrapper.dataset.actualPage;
-                        const drawCanvas = wrapper.querySelector('.draw-canvas');
-                        if (drawCanvas) {
-                            currentDrawings[actualPage] = drawCanvas.toDataURL();
-                        }
-                        
-                        const textsOnPage = [];
-                        wrapper.querySelectorAll('.text-node-wrapper').forEach(wrapperNode => {
-                            const node = wrapperNode.querySelector('.text-node');
-                            if (node) {
-                                textsOnPage.push({
-                                    text: node.innerText,
-                                    x: parseFloat(wrapperNode.dataset.baseX) || 0,
-                                    y: parseFloat(wrapperNode.dataset.baseY) || 0,
-                                    color: node.style.color || activeColor,
-                                    fontSize: parseFloat(node.style.fontSize) || 18
-                                });
-                            }
-                        });
-                        currentTexts[actualPage] = textsOnPage;
-
-                        const imagesOnPage = [];
-                        wrapper.querySelectorAll('.img-node').forEach(node => {
-                            const img = node.querySelector('img');
-                            if (img) {
-                                imagesOnPage.push({
-                                    src: img.src,
-                                    x: parseFloat(node.dataset.baseX) || 0,
-                                    y: parseFloat(node.dataset.baseY) || 0,
-                                    w: parseFloat(node.style.width) || 150,
-                                    h: parseFloat(node.style.height) || 150
-                                });
-                            }
-                        });
-                        currentImages[actualPage] = imagesOnPage;
-                    }
-
-                    if (!currentFileId || !db) { resolve(); return; }
-
-                    const tx = db.transaction("files", "readwrite");
-                    const store = tx.objectStore("files");
-                    const getReq = store.get(currentFileId);
-                    
-                    getReq.onsuccess = e => {
-                        const data = e.target.result;
-                        if (data) {
-                            data.drawings = currentDrawings;
-                            data.texts = currentTexts;
-                            data.images = currentImages;
-                            data.bookmarks = currentBookmarks;
-                            data.pageOrder = [...pageOrder];
-                            const putReq = store.put(data);
-                            putReq.onsuccess = () => resolve();
-                            putReq.onerror = err => reject(err);
-                        } else {
-                            resolve();
-                        }
-                    };
-                    getReq.onerror = err => reject(err);
-                } catch (err) {
-                    reject(err);
-                }
-            });
         }
 
         function savePageData(displayIndex) {
             if (typeof updateAutosaveIndicator === 'function') updateAutosaveIndicator('saving');
             clearTimeout(saveTimeout);
             saveTimeout = setTimeout(() => {
-                savePageDataNow(displayIndex).then(() => {
-                    if (typeof updateAutosaveIndicator === 'function') updateAutosaveIndicator('saved');
-                }).catch(err => console.error("Autosave Error:", err));
-            }, 300);
+                savePageDataNow(displayIndex).catch(err => console.error('Autosave Error:', err));
+            }, 140);
         }
 
         function restorePageDrawings(actualPageNum, drawCanvas) {
@@ -2091,13 +2621,14 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
             
             wrapperNode.dataset.baseX = x;
             wrapperNode.dataset.baseY = y;
-            wrapperNode.style.left = ((x / baseW) * 100) + '%';
-            wrapperNode.style.top = ((y / baseH) * 100) + '%';
+            wrapperNode.style.left = (x * zoomScale) + 'px';
+            wrapperNode.style.top = (y * zoomScale) + 'px';
 
             const node = document.createElement('div');
             node.className = 'text-node';
             node.contentEditable = true;
             node.innerText = text;
+            node.addEventListener('input', () => savePageData(displayIndex));
             node.style.color = color;
             node.style.fontSize = fontSize + 'px';
 
@@ -2155,8 +2686,8 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
 
                     wrapperNode.dataset.baseX = newBaseX;
                     wrapperNode.dataset.baseY = newBaseY;
-                    wrapperNode.style.left = ((newBaseX / baseW) * 100) + '%';
-                    wrapperNode.style.top = ((newBaseY / baseH) * 100) + '%';
+                    wrapperNode.style.left = (newBaseX * zoomScale) + 'px';
+                    wrapperNode.style.top = (newBaseY * zoomScale) + 'px';
                 }
             };
 
@@ -2213,8 +2744,8 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
             node.className = 'img-node';
             node.dataset.baseX = x;
             node.dataset.baseY = y;
-            node.style.left = ((x / baseW) * 100) + '%';
-            node.style.top = ((y / baseH) * 100) + '%';
+            node.style.left = (x * zoomScale) + 'px';
+            node.style.top = (y * zoomScale) + 'px';
             node.style.width = w + 'px';
             node.style.height = h + 'px';
 
@@ -2291,8 +2822,8 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
 
                     node.dataset.baseX = newBaseX;
                     node.dataset.baseY = newBaseY;
-                    node.style.left = ((newBaseX / baseW) * 100) + '%';
-                    node.style.top = ((newBaseY / baseH) * 100) + '%';
+                    node.style.left = (newBaseX * zoomScale) + 'px';
+                    node.style.top = (newBaseY * zoomScale) + 'px';
                 }
             };
 
@@ -2324,15 +2855,16 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
         }
 
         async function exportFullPDF() {
-            if (!pdfDoc || !window.PDFLib) return;
-            await savePageDataNow(currentPage);
+            if (!pdfDoc || !window.PDFLib || !currentFileId) return;
+            try {
+                await savePageDataNow(currentPage);
+                await saveDocumentSettings();
+                updateAutosaveIndicator('saving');
 
-            const tx = db.transaction("files", "readonly");
-            tx.objectStore("files").get(currentFileId).onsuccess = async e => {
-                const record = e.target.result;
-                if (!record || !record.data) return;
-
-                const pdfLibDoc = await PDFLib.PDFDocument.load(record.data);
+                const record = await getRecord(currentFileId);
+                if (!record || (!record.data && !record.chunked)) return;
+                const sourceBytes = await assemblePdfBytes(record);
+                const pdfLibDoc = await PDFLib.PDFDocument.load(sourceBytes);
                 const newDoc = await PDFLib.PDFDocument.create();
 
                 for (let i = 0; i < pageOrder.length; i++) {
@@ -2341,60 +2873,152 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
                     const page = newDoc.addPage(copiedPage);
                     const { width, height } = page.getSize();
 
-                    // 1. تصدير الرسومات
-                    if (record.drawings && record.drawings[actualPageNum]) {
+                    if (currentDrawings && currentDrawings[actualPageNum]) {
                         try {
-                            const img = await newDoc.embedPng(record.drawings[actualPageNum]);
-                            page.drawImage(img, { x: 0, y: 0, width: width, height: height });
-                        } catch(err) { console.error("Error embedding drawings:", err); }
+                            const img = await newDoc.embedPng(currentDrawings[actualPageNum]);
+                            page.drawImage(img, { x: 0, y: 0, width, height });
+                        } catch (err) { console.error('Error embedding drawings:', err); }
                     }
 
-                    // 2. تصدير الصور المضافة
-                    if (record.images && record.images[actualPageNum]) {
-                        for (const imgData of record.images[actualPageNum]) {
+                    if (currentImages && currentImages[actualPageNum]) {
+                        for (const imgData of currentImages[actualPageNum]) {
                             try {
                                 let embeddedImg;
-                                if (imgData.src.startsWith('data:image/png')) {
-                                    embeddedImg = await newDoc.embedPng(imgData.src);
-                                } else {
-                                    embeddedImg = await newDoc.embedJpg(imgData.src);
-                                }
+                                if (String(imgData.src).startsWith('data:image/png')) embeddedImg = await newDoc.embedPng(imgData.src);
+                                else embeddedImg = await newDoc.embedJpg(imgData.src);
                                 const pdfY = height - imgData.y - imgData.h;
-                                page.drawImage(embeddedImg, {
-                                    x: imgData.x,
-                                    y: pdfY,
-                                    width: imgData.w,
-                                    height: imgData.h
-                                });
-                            } catch(err) { console.error("Error embedding image node:", err); }
+                                page.drawImage(embeddedImg, { x: imgData.x, y: pdfY, width: imgData.w, height: imgData.h });
+                            } catch (err) { console.error('Error embedding image node:', err); }
                         }
                     }
 
-                    // 3. تصدير النصوص
-                    if (record.texts && record.texts[actualPageNum]) {
-                        record.texts[actualPageNum].forEach(t => {
+                    if (currentTexts && currentTexts[actualPageNum]) {
+                        currentTexts[actualPageNum].forEach(t => {
                             if (!t.text) return;
-                            const pdfY = height - t.y - (t.fontSize || 18);
                             try {
+                                const pdfY = height - t.y - (t.fontSize || 18);
                                 page.drawText(t.text, {
                                     x: t.x,
                                     y: pdfY > 0 ? pdfY : t.y,
                                     size: t.fontSize || 18,
                                     color: parseColorToPdfRgb(t.color)
                                 });
-                            } catch(err) { console.error("Error drawing text node:", err); }
+                            } catch (err) { console.error('Error drawing text node:', err); }
                         });
                     }
                 }
 
-                const pdfBytes = await newDoc.save();
+                const pdfBytes = await newDoc.save({ useObjectStreams: true });
                 const blob = new Blob([pdfBytes], { type: 'application/pdf' });
                 const link = document.createElement('a');
-                link.href = URL.createObjectURL(blob);
+                const url = URL.createObjectURL(blob);
+                link.href = url;
                 link.download = `notebook_export_${Date.now()}.pdf`;
+                document.body.appendChild(link);
                 link.click();
-            };
+                link.remove();
+                setTimeout(() => URL.revokeObjectURL(url), 60_000);
+                updateAutosaveIndicator('saved');
+            } catch (err) {
+                console.error('Export error:', err);
+                updateAutosaveIndicator('saved');
+                alert('Export failed: ' + (err?.message || err));
+            }
         }
+
+
+        // ===== Lightweight Select / Lasso-like rectangle selection =====
+        let selectedNodes = new Set();
+        let selectionDrag = null;
+        function clearSelection(){selectedNodes.forEach(n=>n.classList.remove('selected-node'));selectedNodes.clear();}
+        function nodeRect(n){return n.getBoundingClientRect();}
+        function rectIntersects(a,b){return !(a.right<b.left||a.left>b.right||a.bottom<b.top||a.top>b.bottom);}
+        document.addEventListener('pointerdown',e=>{
+            if(currentTool!=='select')return;
+            const wrapper=e.target.closest('.page-wrapper');
+            if(!wrapper)return;
+            const selected=e.target.closest('.selected-node');
+            if(selected){
+                // Group move for selected text/images. Ink remains on its shared canvas.
+                e.preventDefault(); e.stopImmediatePropagation();
+                const startX=e.clientX,startY=e.clientY, parent=wrapper, rect=parent.getBoundingClientRect();
+                const origin=[...selectedNodes].map(n=>({n,x:+(n.dataset.baseX||0),y:+(n.dataset.baseY||0)}));
+                const move=ev=>{const dx=(ev.clientX-startX)*(+(parent.dataset.baseWidth||600)/rect.width);const dy=(ev.clientY-startY)*(+(parent.dataset.baseHeight||800)/rect.height);origin.forEach(o=>{const nx=o.x+dx,ny=o.y+dy;o.n.dataset.baseX=nx;o.n.dataset.baseY=ny;o.n.style.left=(nx*zoomScale)+'px';o.n.style.top=(ny*zoomScale)+'px';});};
+                const up=()=>{window.removeEventListener('pointermove',move,true);window.removeEventListener('pointerup',up,true);savePageData(+wrapper.dataset.pageNum||currentPage);};
+                window.addEventListener('pointermove',move,true);window.addEventListener('pointerup',up,true);return;
+            }
+            if(e.target.closest('.text-node,.img-node,.delete-text-badge,.delete-img,.resize-handle'))return;
+            clearSelection();
+            const r=wrapper.getBoundingClientRect(); const x0=e.clientX-r.left,y0=e.clientY-r.top;
+            const box=document.createElement('div');box.className='selection-box';box.style.left=x0+'px';box.style.top=y0+'px';box.style.width='0px';box.style.height='0px';wrapper.appendChild(box);
+            const move=ev=>{const x=ev.clientX-r.left,y=ev.clientY-r.top;box.style.left=Math.min(x0,x)+'px';box.style.top=Math.min(y0,y)+'px';box.style.width=Math.abs(x-x0)+'px';box.style.height=Math.abs(y-y0)+'px';};
+            const up=()=>{window.removeEventListener('pointermove',move,true);window.removeEventListener('pointerup',up,true);const br=box.getBoundingClientRect();box.remove();wrapper.querySelectorAll('.text-node-wrapper,.img-node').forEach(n=>{if(rectIntersects(br,nodeRect(n))){selectedNodes.add(n);n.classList.add('selected-node');}});};
+            window.addEventListener('pointermove',move,true);window.addEventListener('pointerup',up,true);
+        },true);
+        window.addEventListener('keydown',e=>{if(e.key==='Escape')clearSelection();if((e.key==='Delete'||e.key==='Backspace')&&selectedNodes.size){const grouped=[...selectedNodes];clearSelection();grouped.forEach(n=>n.remove());savePageData(currentPage);}});
+
+        // ===== PDF Outline in the existing sidebar =====
+        const baseRenderSidebarBookmarks = renderSidebarBookmarks;
+        async function renderSidebarBookmarks(){
+            baseRenderSidebarBookmarks();
+            const list=document.getElementById('sidebarBookmarksList');
+            if(!list||!pdfDoc)return;
+            try{
+                const outline=await pdfDoc.getOutline();
+                if(!outline?.length)return;
+                const heading=document.createElement('div');heading.style.cssText='font-size:12px;font-weight:700;opacity:.7;margin:12px 3px 4px';heading.textContent='PDF OUTLINE';list.appendChild(heading);
+                const add=(items,depth=0)=>items.forEach(item=>{const el=document.createElement('div');el.className='bookmark-item';el.style.marginLeft=Math.min(depth*10,30)+'px';const info=document.createElement('div');info.className='bookmark-info';const title=document.createElement('div');title.className='bookmark-title';title.textContent=item.title||'Untitled';info.appendChild(title);el.appendChild(info);el.onclick=async()=>{try{const dest=await pdfDoc.getDestination(item.dest);if(dest){const ref=dest[0];const idx=await pdfDoc.getPageIndex(ref);const actual=idx+1;const display=pageOrder.indexOf(actual)+1;if(display>0)goToPage(display);}}catch(_){}toggleSidebar(false);};list.appendChild(el);if(item.items?.length)add(item.items,depth+1);});
+                add(outline,0);
+            }catch(e){console.debug('Outline unavailable',e);}
+        }
+
+        // ===== Search =====
+        let pdfSearchCache = new Map();
+        let pdfSearchResults = [];
+        let pdfSearchIndex = -1;
+        function toggleSearchPanel(){
+            const p=document.getElementById('search-panel');p?.classList.toggle('show');
+            if(p?.classList.contains('show')) setTimeout(()=>document.getElementById('pdfSearchInput')?.focus(),20);
+        }
+        function closeSearchPanel(){document.getElementById('search-panel')?.classList.remove('show');clearSearchHighlights();}
+        function clearSearchHighlights(){document.querySelectorAll('.search-page-match').forEach(el=>el.classList.remove('search-page-match'));}
+        async function getPageTextCached(actual){
+            if(pdfSearchCache.has(actual))return pdfSearchCache.get(actual);
+            const page=await pdfDoc.getPage(actual);const tc=await page.getTextContent();const text=tc.items.map(i=>i.str).join(' ');pdfSearchCache.set(actual,text);page.cleanup?.();return text;
+        }
+        async function runPdfSearch(){
+            const q=(document.getElementById('pdfSearchInput')?.value||'').trim().toLowerCase();if(!q||!pdfDoc)return;
+            pdfSearchResults=[];pdfSearchIndex=-1;clearSearchHighlights();const st=document.getElementById('searchStatus');if(st)st.textContent='…';
+            for(let d=1;d<=pageOrder.length;d++){
+                const actual=pageOrder[d-1];const text=(await getPageTextCached(actual)).toLowerCase();if(text.includes(q))pdfSearchResults.push(d);
+                if(d%5===0)await new Promise(r=>setTimeout(r,0));
+            }
+            if(pdfSearchResults.length){pdfSearchIndex=0;showSearchResult();}
+            if(st)st.textContent=pdfSearchResults.length?`1 / ${pdfSearchResults.length}`:'0 / 0';
+        }
+        function showSearchResult(){
+            if(!pdfSearchResults.length)return;
+            clearSearchHighlights();
+            const p=pdfSearchResults[pdfSearchIndex];
+            goToPage(p);
+            requestAnimationFrame(()=>document.querySelector(`.page-wrapper[data-page-num="${p}"]`)?.classList.add('search-page-match'));
+            const st=document.getElementById('searchStatus');if(st)st.textContent=`${pdfSearchIndex+1} / ${pdfSearchResults.length}`;
+        }
+        function searchNavigate(dir){if(!pdfSearchResults.length)return;pdfSearchIndex=(pdfSearchIndex+dir+pdfSearchResults.length)%pdfSearchResults.length;showSearchResult();}
+        document.getElementById('pdfSearchInput')?.addEventListener('keydown',e=>{if(e.key==='Enter'){if(pdfSearchResults.length)searchNavigate(1);else runPdfSearch();}});
+
+        // ===== Dark mode =====
+        function applyDarkMode(){document.body.classList.toggle('dark-mode',localStorage.getItem('zakerDarkMode')==='1');}
+        function toggleDarkMode(){const on=localStorage.getItem('zakerDarkMode')==='1';localStorage.setItem('zakerDarkMode',on?'0':'1');applyDarkMode();scheduleDocumentSettingsSave();}
+        // Dark mode UI was removed; do not re-apply any previous dark-mode preference.
+        // Persist small UI preferences without touching PDF bytes.
+        const _oldSaveDocumentSettings = saveDocumentSettings;
+        saveDocumentSettings = async function(){
+            await _oldSaveDocumentSettings();
+            try { localStorage.setItem('zakerLastZoom', String(zoomScale)); localStorage.setItem('zakerLastViewMode', viewMode); } catch(e){}
+        };
+        window.addEventListener('beforeunload',()=>{try{scheduleDocumentSettingsSave();}catch(e){}});
+        updateZoomLabel();
     </script>
 </body>
 </html>
