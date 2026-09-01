@@ -810,7 +810,7 @@
         <div class="header">
             <h2>Zaker by Yahya Atwa</h2>
             <div>
-                <input type="file" id="pdfUploader" accept="application/pdf" style="display:none;">
+                <input type="file" id="pdfUploader" accept="application/pdf" multiple style="display:none;">
                 <button class="btn-apple apple-glass" onclick="openPdfSmart()">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Open PDF
                 </button>
@@ -1041,9 +1041,20 @@
         updateSystemStatus();
 
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js', { scope: './' }).then(reg => reg.update()).catch(err => console.log('SW registration failed:', err));
+            let swReloaded = false;
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (swReloaded) return;
+                swReloaded = true;
+                window.location.reload();
             });
+            window.addEventListener('load', async () => {
+                try {
+                    const reg = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+                    await reg.update();
+                } catch (err) {
+                    console.log('SW registration failed:', err);
+                }
+            }, { once: true });
         }
 
         // PWA storage: ask the browser to keep the local PDF database from being evicted.
@@ -1064,7 +1075,7 @@
         const PDF_CHUNK_SIZE = 4 * 1024 * 1024;
         const THUMB_SCALE = 0.10;
 
-        const request = indexedDB.open("AppleGlassPDFDB", 4);
+        const request = indexedDB.open("AppleGlassPDFDB", 5);
         request.onupgradeneeded = e => {
             db = e.target.result;
             if (!db.objectStoreNames.contains("files")) {
@@ -1087,13 +1098,21 @@
                 const portable = db.createObjectStore("portable", { keyPath: ["fileId", "index"] });
                 portable.createIndex("fileId", "fileId", { unique: false });
             }
+            // v5: portable PDFs were a second full copy of every document and
+            // could consume the tablet's quota very quickly. The editable source
+            // is already stored in chunks, so old portable copies can be discarded.
+            if (e.oldVersion < 5 && db.objectStoreNames.contains("portable")) {
+                try { db.transaction.objectStore("portable").clear(); } catch (_) {}
+            }
         };
 
         request.onsuccess = e => {
             db = e.target.result;
             db.onversionchange = () => db.close();
             navigator.storage?.persist?.().catch(()=>{});
-            cleanupDuplicateFileRecords().finally(() => loadHomeFiles());
+            cleanupIncompleteImports()
+                .then(() => cleanupDuplicateFileRecords())
+                .finally(() => loadHomeFiles());
             initColorPicker();
         };
         request.onerror = e => console.error('IndexedDB error:', e.target?.error);
@@ -1201,14 +1220,17 @@
                     try { await navigator.storage.persist(); } catch (_) {}
                 }
                 const count = Math.ceil(file.size / PDF_CHUNK_SIZE);
+                let total = 0;
                 for (let i = 0; i < count; i++) {
                     const blob = file.slice(i * PDF_CHUNK_SIZE, Math.min(file.size, (i + 1) * PDF_CHUNK_SIZE), 'application/octet-stream');
                     await idbRequest(db.transaction('chunks', 'readwrite').objectStore('chunks').put({
                         fileId, index: i, data: blob, size: blob.size
                     }));
+                    total += blob.size;
                     // Yield periodically so a weak tablet keeps responding while saving very large PDFs.
                     if ((i + 1) % 3 === 0) await new Promise(resolve => setTimeout(resolve, 0));
                 }
+                return { count, total };
             } catch (err) {
                 console.error('Chunked PDF storage failed:', err);
                 throw err;
@@ -1479,7 +1501,6 @@
             updatePageBookmarkUI(currentPage);
             saveDocumentSettings();
             renderSidebarBookmarks();
-            schedulePortablePDFSave();
         }
 
         function updatePageBookmarkUI(displayIndex) {
@@ -1811,6 +1832,20 @@
             if(input) input.addEventListener('input',()=>{const h=normalizeHex(input.value);if(h)syncColorEditorFromHex(h);});
         });
 
+        async function cleanupIncompleteImports() {
+            if (!db) return;
+            try {
+                const all = await idbRequest(db.transaction('files', 'readonly').objectStore('files').getAll());
+                const incomplete = all.filter(r => r && r.storageComplete === false);
+                for (const record of incomplete) {
+                    try { await deleteAllChunks(record.id); } catch (_) {}
+                    try { await idbRequest(db.transaction('files', 'readwrite').objectStore('files').delete(record.id)); } catch (_) {}
+                }
+            } catch (err) {
+                console.warn('Incomplete import cleanup skipped:', err);
+            }
+        }
+
         async function cleanupDuplicateFileRecords() {
             if (!db) return;
             try {
@@ -1853,8 +1888,12 @@
             grid.innerHTML = '';
             try {
                 const files = await idbRequest(db.transaction('files', 'readonly').objectStore('files').getAll());
-                files.sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
-                files.filter(f => !f.deleted).forEach(f => {
+                files.sort((a, b) => {
+                    const ao = Number(a.lastOpenedAt || 0), bo = Number(b.lastOpenedAt || 0);
+                    if (ao !== bo) return bo - ao;
+                    return String(a.name).localeCompare(String(b.name), undefined, { numeric: true });
+                });
+                files.filter(f => !f.deleted && f.storageComplete !== false).forEach(f => {
                     const card = document.createElement('div');
                     card.className = 'note-card apple-glass';
                     const del = document.createElement('button');
@@ -1907,7 +1946,6 @@
                     savePageDataNow(currentPage).catch(() => {}),
                     saveDocumentSettings().catch(() => {})
                 ]);
-                await savePortablePDF().catch(() => {});
             }
             if (typeof toggleEditMode === 'function') toggleEditMode(false);
             document.getElementById('editor-screen').style.display = 'none';
@@ -1931,9 +1969,9 @@
                 file.slice(tailStart, file.size).arrayBuffer()
             ]);
 
-            const meta = new TextEncoder().encode(
-                `PDFv3|${file.size}|${file.lastModified || 0}|${file.type || ''}|`
-            );
+            // The identity must not depend on lastModified: the same PDF can be
+            // copied/downloaded with different filesystem timestamps.
+            const meta = new TextEncoder().encode(`PDFv4|${file.size}|`);
             const combined = new Uint8Array(meta.byteLength + head.byteLength + tail.byteLength);
             combined.set(meta, 0);
             combined.set(new Uint8Array(head), meta.byteLength);
@@ -1964,14 +2002,20 @@
 
             if (!isTouchDevice && window.showOpenFilePicker) {
                 try {
-                    const [handle] = await window.showOpenFilePicker({
-                        multiple:false,
+                    const handles = await window.showOpenFilePicker({
+                        multiple:true,
                         types:[{description:'PDF document',accept:{'application/pdf':['.pdf']}}]
                     });
-                    if (!handle) return;
-                    await ensureHandlePermission(handle, true);
-                    const file = await handle.getFile();
-                    await importPdfFile(file, handle);
+                    if (!handles?.length) return;
+                    for (const handle of handles) {
+                        try {
+                            await ensureHandlePermission(handle, true);
+                            const file = await handle.getFile();
+                            await importPdfFile(file, handle);
+                        } catch (err) {
+                            console.warn('Could not import selected PDF:', err);
+                        }
+                    }
                     return;
                 } catch(err) {
                     if (err?.name === 'AbortError') return;
@@ -2008,7 +2052,9 @@
             if (existing) {
                 existing.deleted = false;
                 existing.deletedAt = null;
+                existing.storageComplete = existing.storageComplete !== false;
                 existing.lastReaddedAt = Date.now();
+                existing.lastOpenedAt = Date.now();
                 if (fileHandle) existing.fileHandle = fileHandle;
                 await putRecord(existing);
                 await openPDF(existing.id);
@@ -2016,13 +2062,19 @@
                 return;
             }
             const id='pdf_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
-            const record={id,name:file.name,size:file.size,fingerprint,latestWrittenFingerprint:fingerprint,deleted:false,chunked:true,chunkSize:PDF_CHUNK_SIZE,createdAt:Date.now()};
+            const record={id,name:file.name,size:file.size,fingerprint,latestWrittenFingerprint:fingerprint,deleted:false,chunked:true,chunkSize:PDF_CHUNK_SIZE,chunkCount:0,storedBytes:0,storageComplete:false,createdAt:Date.now(),lastOpenedAt:Date.now()};
             if(fileHandle) record.fileHandle=fileHandle;
             try {
                 updateAutosaveIndicator('saving');
-                await putRecord(record); await storePdfInChunks(id,file);
+                await putRecord(record);
+                const stored = await storePdfInChunks(id,file);
+                record.chunkCount = stored.count;
+                record.storedBytes = stored.total;
+                record.storageComplete = stored.total === file.size;
+                if (!record.storageComplete) throw new Error('PDF storage verification failed.');
+                await putRecord(record);
                 await putSettings({fileId:id,pageOrder:[],bookmarks:{},bookmarkVersion:2,viewMode:'horizontal',globalPageStyle:'blank',pageViewState:{}});
-                await openPDF(id); await savePortablePDF().catch(()=>{}); loadHomeFiles();
+                await openPDF(id); loadHomeFiles();
             } catch(err) {
                 console.error('PDF upload failed:',err);
                 try{await deleteAllChunks(id)}catch(_){};
@@ -2032,8 +2084,11 @@
         }
 
         document.getElementById('pdfUploader')?.addEventListener('change', async e => {
-            const file=e.target.files[0]; e.target.value='';
-            if(file) await importPdfFile(file,null);
+            const files=[...e.target.files]; e.target.value='';
+            for (const file of files) {
+                try { await importPdfFile(file,null); }
+                catch (err) { console.error('PDF import error:', err); }
+            }
         });
 
         async function openPDF(id) {
@@ -2052,8 +2107,11 @@
                 }
 
                 const record = await getRecord(id);
-                if (!record || record.deleted) return;
+                if (!record || record.deleted || record.storageComplete === false) return;
                 if (token !== openOperationToken) return;
+
+                record.lastOpenedAt = Date.now();
+                await putRecord(record);
 
                 // Set identity only after the record was successfully found.
                 currentFileId = id;
@@ -2181,11 +2239,17 @@
                 pageOrder.splice(currentPage, 0, newActualPageNum);
                 shiftBookmarks(newActualPageNum, 'insert');
 
+                record.storageComplete = false;
+                await putRecord(record);
                 await deleteAllChunks(currentFileId).catch(() => {});
-                await storePdfInChunks(currentFileId, new Blob([newPdfBytes], { type: 'application/pdf' }));
+                const stored = await storePdfInChunks(currentFileId, new Blob([newPdfBytes], { type: 'application/pdf' }));
                 record.size = newPdfBytes.byteLength;
                 record.chunked = true;
                 record.chunkSize = PDF_CHUNK_SIZE;
+                record.chunkCount = stored.count;
+                record.storedBytes = stored.total;
+                record.storageComplete = stored.total === newPdfBytes.byteLength;
+                if (!record.storageComplete) throw new Error('PDF rewrite verification failed.');
                 delete record.data;
                 await putRecord(record);
                 await clearPortablePdf(currentFileId).catch(() => {});
@@ -2236,11 +2300,17 @@
                 shiftAnnotations(actualToRemove, 'delete');
                 shiftBookmarks(actualToRemove, 'delete');
 
+                record.storageComplete = false;
+                await putRecord(record);
                 await deleteAllChunks(currentFileId).catch(() => {});
-                await storePdfInChunks(currentFileId, new Blob([newPdfBytes], { type: 'application/pdf' }));
+                const stored = await storePdfInChunks(currentFileId, new Blob([newPdfBytes], { type: 'application/pdf' }));
                 record.size = newPdfBytes.byteLength;
                 record.chunked = true;
                 record.chunkSize = PDF_CHUNK_SIZE;
+                record.chunkCount = stored.count;
+                record.storedBytes = stored.total;
+                record.storageComplete = stored.total === newPdfBytes.byteLength;
+                if (!record.storageComplete) throw new Error('PDF rewrite verification failed.');
                 delete record.data;
                 await putRecord(record);
                 await clearPortablePdf(currentFileId).catch(() => {});
@@ -2658,7 +2728,6 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
             // Rebuild the viewer so every draw/text/image event is rebound to the page's actual identity.
             initVirtualViewer();
             renderSidebarBookmarks();
-            schedulePortablePDFSave();
         }
 
         function reorderDOMPages() {
@@ -3226,8 +3295,7 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
                 });
                 await saveDocumentSettings();
                 refreshThumbnail(displayIndex, actualPage);
-                schedulePortablePDFSave();
-                updateAutosaveIndicator('saved');
+                    updateAutosaveIndicator('saved');
             } catch (err) {
                 console.error('Page save error:', err);
                 throw err;
@@ -3576,50 +3644,11 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
             return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
         }
 
-        async function writeBytesToOriginalFile(bytes) {
-            if (!currentFileHandle || !bytes) return false;
-            try {
-                if (!(await ensureHandlePermission(currentFileHandle, false))) return false;
-                const writable=await currentFileHandle.createWritable({keepExistingData:false});
-                await writable.write(new Blob([bytes],{type:'application/pdf'}));
-                await writable.close();
-                const record=await getRecord(currentFileId);
-                if(record){record.fileHandle=currentFileHandle;record.latestWrittenFingerprint=await fingerprintBytes(bytes);record.lastOriginalWriteAt=Date.now();await putRecord(record);}
-                return true;
-            } catch(err) {
-                console.warn('Could not write directly to original PDF:',err);
-                return false;
-            }
-        }
-
-        async function savePortablePDF() {
-            if (!currentFileId || !db || !pdfDoc) return;
-            if (portableSavePromise) {
-                await portableSavePromise;
-                return;
-            }
-            portableSavePromise = (async () => {
-                try {
-                    updateAutosaveIndicator('saving');
-                    const bytes = await buildPortablePdfBytes();
-                    if (bytes) {
-                        await storePortablePdfInChunks(currentFileId, new Blob([bytes], { type: 'application/pdf' }));
-                        await writeBytesToOriginalFile(bytes);
-                    }
-                    updateAutosaveIndicator('saved');
-                } finally {
-                    portableSavePromise = null;
-                }
-            })();
-            await portableSavePromise;
-        }
-
-        function schedulePortablePDFSave() {
-            clearTimeout(portableSaveTimeout);
-            portableSaveTimeout = setTimeout(() => {
-                savePortablePDF().catch(err => console.error('Portable PDF autosave error:', err));
-            }, 1200);
-        }
+        // Autosave persists the source PDF chunks + annotations/settings.
+        // We intentionally do NOT create a second flattened PDF for every document;
+        // that doubled storage usage and made tablets hit IndexedDB quota quickly.
+        async function savePortablePDF() { return; }
+        function schedulePortablePDFSave() {}
 
         async function exportFullPDF() {
             if (!pdfDoc || !window.PDFLib || !currentFileId) return;
@@ -3637,9 +3666,6 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
                     updateAutosaveIndicator('saved');
                     return;
                 }
-                await storePortablePdfInChunks(currentFileId, new Blob([bytes], { type: 'application/pdf' }));
-                await writeBytesToOriginalFile(bytes);
-
                 const blob = new Blob([bytes], { type: 'application/pdf' });
                 const link = document.createElement('a');
                 const url = URL.createObjectURL(blob);
@@ -3751,7 +3777,17 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
             await _oldSaveDocumentSettings();
             try { localStorage.setItem('zakerLastZoom', String(zoomScale)); localStorage.setItem('zakerLastViewMode', viewMode); } catch(e){}
         };
-        window.addEventListener('beforeunload',()=>{try{scheduleDocumentSettingsSave();}catch(e){}});
+        const persistCurrentState = () => {
+            try {
+                if (currentFileId && pdfDoc) {
+                    savePageDataNow(currentPage).catch(()=>{});
+                    saveDocumentSettings().catch(()=>{});
+                }
+            } catch (_) {}
+        };
+        window.addEventListener('pagehide', persistCurrentState);
+        document.addEventListener('visibilitychange', () => { if (document.hidden) persistCurrentState(); });
+        window.addEventListener('beforeunload', persistCurrentState);
         updateZoomLabel();
     </script>
 </body>
