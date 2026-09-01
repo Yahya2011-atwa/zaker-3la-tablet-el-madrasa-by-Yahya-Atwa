@@ -10,7 +10,6 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <title>Zaker by Yahya Atwa</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-    <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf_viewer.min.css">
     <style>
         * { 
@@ -339,7 +338,7 @@
             box-shadow: 0 12px 35px rgba(0,0,0,0.12);
             flex: 0 0 auto;
             margin: 0 auto;
-            transition: background 0.3s ease;
+            transition: background 0.2s ease;
             min-height: 500px;
         }
 
@@ -377,30 +376,27 @@
         .textLayer ::selection { background: rgba(0, 0, 0, 0.15); color: transparent; }
         .textLayer span { color: transparent; cursor: text; position: absolute; white-space: pre; transform-origin: 0% 0%; }
 
-        /* البوكمارك الحمراء على الصفحة من فوق وتحتها ظل */
+        /* Modern bookmark: clean solid tab with a triangular cut at the bottom. */
         .page-bookmark-badge {
             position: absolute;
-            top: -12px;
-            right: 30px;
-            width: 32px;
+            top: -1px;
+            right: 28px;
+            width: 30px;
             height: 42px;
-            background: linear-gradient(135deg, #ff3b30 0%, #d32f2f 100%);
-            border-radius: 0 0 6px 6px;
-            box-shadow: 0 6px 12px rgba(255, 59, 48, 0.4), 0 2px 4px rgba(0,0,0,0.2);
+            background: #ff3b30;
+            clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+            box-shadow: 0 5px 10px rgba(255, 59, 48, 0.25);
             z-index: 15;
             display: none;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-size: 14px;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: transform 0.16s ease, filter 0.16s ease;
         }
         .page-bookmark-badge:hover {
             transform: translateY(-2px);
+            filter: brightness(1.04);
         }
         .page-wrapper.bookmarked .page-bookmark-badge {
-            display: flex;
+            display: block;
         }
 
         /* ستايل القائمة الجانبية للبوكماركس والفهرس */
@@ -479,9 +475,8 @@
             cursor: pointer;
             transition: background 0.2s;
         }
-        .bookmark-item:hover {
-            background: rgba(255, 255, 255, 0.9);
-        }
+        .bookmark-item:hover { background: rgba(255, 255, 255, 0.9); }
+        .bookmark-item.current { border-color: rgba(0,122,255,.25); background: rgba(0,122,255,.08); }
         .bookmark-info {
             display: flex;
             flex-direction: column;
@@ -512,6 +507,11 @@
             color: #ff3b30;
             cursor: pointer;
             font-size: 14px;
+        }
+        .bookmark-empty { text-align:center; color:#8e8e93; font-size:13px; margin-top:30px; line-height:1.6; }
+        .bookmark-empty span { font-size:11px; opacity:.8; }
+        .sidebar-header h3::after {
+            content: attr(data-count); margin-left:7px; font-size:10px; opacity:.55; font-weight:700;
         }
 
         #bottom-thumbnails-bar {
@@ -557,6 +557,13 @@
         .thumb-item { overflow: visible; }
         .thumb-annotation-canvas { position: absolute; left: 0; top: 0; height: 60px; width: auto; border-radius: 6px; pointer-events: none; z-index: 1; }
         .thumb-page-num { z-index: 2; }
+        .thumb-bookmark-badge {
+            position:absolute; top:-5px; right:2px; width:14px; height:21px; z-index:12;
+            display:none; background:#ff3b30;
+            clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%);
+            box-shadow:0 2px 5px rgba(255,59,48,.22); pointer-events:none;
+        }
+        .thumb-item.bookmarked .thumb-bookmark-badge { display:block; }
 
         .thumb-page-num {
             position: absolute; bottom: 3px; right: 3px; background: rgba(255, 255, 255, 0.85);
@@ -574,11 +581,8 @@
         }
 
         .thumbnails-container.edit-mode .thumb-delete-badge { display: flex; }
-        .thumbnails-container.edit-mode .thumb-item { animation: jiggle 0.25s infinite alternate ease-in-out; }
-        @keyframes jiggle {
-            0% { transform: rotate(-1.5deg) scale(0.98); }
-            100% { transform: rotate(1.5deg) scale(1.02); }
-        }
+        .thumbnails-container.edit-mode .thumb-item { animation: none; }
+        .thumbnails-container.edit-mode .thumb-item.active { transform: scale(1.05); }
 
         .thumb-item.dragging { opacity: 0.3; }
 
@@ -602,6 +606,8 @@
         html.low-power * { scroll-behavior: auto !important; }
         html.low-power .apple-glass { backdrop-filter: none !important; -webkit-backdrop-filter: none !important; }
         html.low-power .glass-bg { filter: none; opacity:.96; }
+        html.low-power .page-wrapper { box-shadow: 0 5px 14px rgba(0,0,0,.08); }
+        html.low-power .color-modal-overlay { backdrop-filter:none; -webkit-backdrop-filter:none; background:rgba(0,0,0,.18); }
         html.low-power #status-bar, html.low-power #eraser-cursor { backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
         #extra-toolbar { display:flex; gap:5px; align-items:center; flex-shrink:0; }
         #extra-toolbar button { padding:6px 9px; border-radius:20px; border:.5px solid rgba(0,0,0,.08); background:rgba(0,0,0,.04); color:#1c1c1e; cursor:pointer; font-size:13px; font-weight:600; }
@@ -620,6 +626,93 @@
         body.dark-mode #extra-toolbar button, body.dark-mode #zoom-controls button, body.dark-mode #search-panel button { background:rgba(255,255,255,.08); color:#f5f5f7; }
         body.dark-mode #pdfSearchInput { background:rgba(255,255,255,.08); color:#f5f5f7; }
         .search-page-match { outline:3px solid #ff9500; outline-offset:3px; }
+
+        /* ===== In-app color wheel ===== */
+        .color-palette {
+            display:flex; gap:6px; align-items:center; background:rgba(0,0,0,.04);
+            padding:3px 6px; border-radius:20px; border:.5px solid rgba(0,0,0,.08); flex-shrink:0;
+        }
+        .color-wheel-button {
+            position:relative; width:25px; height:25px; border:0; padding:2px; border-radius:50%;
+            cursor:pointer; background:conic-gradient(#ff3b30,#ffcc00,#34c759,#00c7be,#007aff,#5856d6,#af52de,#ff2d55,#ff3b30);
+            box-shadow:0 1px 5px rgba(0,0,0,.18); transition:transform .16s ease;
+        }
+        .color-wheel-button::after {
+            content:""; position:absolute; inset:5px; border-radius:50%; background:#fff;
+            box-shadow:inset 0 0 0 1px rgba(0,0,0,.08);
+        }
+        .color-wheel-button .color-wheel-dot { position:absolute; inset:8px; border-radius:50%; background:#000; z-index:1; }
+        .color-wheel-button:active { transform:scale(.9); }
+        .recent-colors { display:flex; gap:4px; align-items:center; }
+        .recent-color-swatch {
+            width:18px; height:18px; border-radius:5px; cursor:pointer; border:1px solid rgba(0,0,0,.14);
+            box-shadow:0 1px 2px rgba(0,0,0,.08); transition:transform .14s ease;
+        }
+        .recent-color-swatch:hover { transform:scale(1.14); }
+
+        .color-modal-overlay {
+            position:fixed; inset:0; z-index:3000; display:none; align-items:center; justify-content:center;
+            padding:20px; background:rgba(0,0,0,.24); backdrop-filter:blur(5px); -webkit-backdrop-filter:blur(5px);
+        }
+        .color-modal-overlay.show { display:flex; }
+        .color-modal {
+            width:min(440px,94vw); max-height:min(760px,90dvh); overflow:auto; padding:16px;
+            border-radius:24px; color:#1c1c1e;
+        }
+        .color-modal-header,.saved-title-row { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+        .color-modal-header { margin-bottom:12px; }
+        .color-modal-header strong { font-size:17px; }
+        .saved-color-count { margin-left:7px; font-size:11px; opacity:.55; font-weight:600; }
+        .color-modal-close,.clear-saved-colors {
+            border:0; background:rgba(0,0,0,.05); color:inherit; border-radius:14px; cursor:pointer;
+        }
+        .color-modal-close { width:30px; height:30px; font-size:20px; line-height:1; }
+        .clear-saved-colors { padding:5px 9px; font-size:11px; }
+        .color-editor { display:flex; flex-direction:column; gap:12px; }
+        .color-wheel-wrap { position:relative; display:flex; flex-direction:column; align-items:center; gap:14px; }
+        .color-wheel {
+            width:210px; height:210px; border-radius:50%;
+            background:conic-gradient(#ff0000,#ffff00,#00ff00,#00ffff,#0000ff,#ff00ff,#ff0000);
+            position:relative; cursor:crosshair; box-shadow:0 8px 22px rgba(0,0,0,.14);
+        }
+        .color-wheel::before {
+            content:""; position:absolute; inset:17px; border-radius:50%;
+            background:rgba(255,255,255,.92); box-shadow:inset 0 0 0 1px rgba(0,0,0,.07);
+        }
+        .color-wheel-center { position:absolute; left:50%; top:50%; width:25px; height:25px; margin:-12.5px; border-radius:50%; background:#fff; border:2px solid rgba(0,0,0,.28); z-index:2; pointer-events:none; }
+        .color-sv {
+            width:min(320px,82vw); height:145px; border-radius:14px; cursor:crosshair;
+            background:linear-gradient(to top,#000,transparent),linear-gradient(to right,#fff,#f00);
+            box-shadow:inset 0 0 0 1px rgba(0,0,0,.09); position:relative;
+        }
+        .color-sv::after {
+            content:""; position:absolute; width:14px; height:14px; border:2px solid #fff; border-radius:50%;
+            box-shadow:0 0 0 1px rgba(0,0,0,.45); transform:translate(-50%,-50%); left:var(--sv-x,100%); top:var(--sv-y,0%); pointer-events:none;
+        }
+        .color-preview-row { display:flex; align-items:center; gap:8px; }
+        .color-preview { width:40px; height:36px; border-radius:11px; border:1px solid rgba(0,0,0,.12); flex-shrink:0; }
+        .color-hex-input {
+            flex:1; min-width:0; height:36px; border:0; outline:0; border-radius:11px; padding:0 11px;
+            background:rgba(0,0,0,.06); color:inherit; font:600 13px ui-monospace,SFMono-Regular,Menlo,monospace; text-transform:uppercase;
+        }
+        .color-save-btn {
+            height:36px; padding:0 14px; border:0; border-radius:11px; background:#1c1c1e; color:#fff; font-weight:700; cursor:pointer;
+        }
+        .color-section-title { margin:15px 0 7px; font-size:11px; font-weight:800; letter-spacing:.2px; opacity:.62; }
+        .color-grid { display:grid; grid-template-columns:repeat(10,minmax(0,1fr)); gap:7px; }
+        .color-grid button {
+            aspect-ratio:1; min-width:22px; border:0; border-radius:7px; cursor:pointer;
+            box-shadow:inset 0 0 0 1px rgba(0,0,0,.12),0 1px 3px rgba(0,0,0,.08);
+        }
+        .saved-grid { max-height:180px; overflow:auto; padding:2px; }
+        .saved-grid:empty::after {
+            content:"Choose a color and press Save"; grid-column:1/-1; padding:16px 4px; text-align:center; font-size:11px; opacity:.5;
+        }
+        body.dark-mode .color-modal { color:#f5f5f7; }
+        body.dark-mode .color-modal-close, body.dark-mode .clear-saved-colors { background:rgba(255,255,255,.08); }
+        body.dark-mode .color-hex-input { background:rgba(255,255,255,.08); color:#f5f5f7; }
+        body.dark-mode .color-save-btn { background:#f5f5f7; color:#111214; }
+
         @media (max-width:650px) {
             #zoom-controls { left:7px; right:auto; bottom:7px; }
             #toolbar-container { width:96vw; top:9px; }
@@ -656,11 +749,48 @@
     <div id="sidebar-overlay" onclick="toggleSidebar(false)"></div>
     <div id="sidebar" class="apple-glass">
         <div class="sidebar-header">
-            <h3>Bookmarks & Outline</h3>
+            <h3>Bookmarks</h3>
             <button class="sidebar-close" onclick="toggleSidebar(false)">✕</button>
         </div>
         <div class="sidebar-content" id="sidebarBookmarksList">
             <!-- سيتم تعبئتها ديناميكياً -->
+        </div>
+    </div>
+
+    <!-- Custom in-app color wheel / saved palette -->
+    <div id="color-modal-overlay" class="color-modal-overlay" onclick="closeColorWheel(event)">
+        <div id="color-modal" class="color-modal apple-glass" onclick="event.stopPropagation()">
+            <div class="color-modal-header">
+                <div>
+                    <strong>Colors</strong>
+                    <span id="savedColorCount" class="saved-color-count">0 saved</span>
+                </div>
+                <button class="color-modal-close" onclick="closeColorWheel()">×</button>
+            </div>
+
+            <div class="color-editor">
+                <div class="color-wheel-wrap">
+                    <div id="colorWheel" class="color-wheel" title="Choose hue">
+                        <div class="color-wheel-center"></div>
+                    </div>
+                    <div id="colorSV" class="color-sv" title="Choose saturation and brightness"></div>
+                </div>
+
+                <div class="color-preview-row">
+                    <div id="colorPreview" class="color-preview"></div>
+                    <input id="colorHexInput" class="color-hex-input" value="#000000" maxlength="7" spellcheck="false" aria-label="Hex color">
+                    <button class="color-save-btn" onclick="saveActiveColor()">Save</button>
+                </div>
+            </div>
+
+            <div class="color-section-title">Recent</div>
+            <div id="modalRecentColors" class="color-grid recent-grid"></div>
+
+            <div class="color-section-title saved-title-row">
+                <span>Saved colors</span>
+                <button class="clear-saved-colors" onclick="clearSavedColors()">Clear</button>
+            </div>
+            <div id="savedColors" class="color-grid saved-grid"></div>
         </div>
     </div>
 
@@ -669,7 +799,7 @@
             <h2>Zaker by Yahya Atwa</h2>
             <div>
                 <input type="file" id="pdfUploader" accept="application/pdf" style="display:none;">
-                <button class="btn-apple apple-glass" onclick="document.getElementById('pdfUploader').click()">
+                <button class="btn-apple apple-glass" onclick="openPdfSmart()">
                     <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg> Open PDF
                 </button>
             </div>
@@ -738,9 +868,11 @@
                     <svg viewBox="0 0 24 24"><path d="M15.14 3c-.51 0-1.02.2-1.41.59L2.59 14.73c-.78.78-.78 2.05 0 2.83L6.44 21.4c.39.39.9.59 1.41.59h11.16v-2h-5.58l7.13-7.13c.78-.78.78-2.05 0-2.83l-4.01-4.01c-.39-.39-.9-.59-1.41-.59zm-2.12 4.41l3.59 3.59-4.24 4.24-3.59-3.59 4.24-4.24z"/></svg>
                 </button>
 
-                <div class="color-palette">
-                    <input type="color" id="colorPicker" value="#000000" style="width:20px; height:20px; padding:0; border:none; background:none; cursor:pointer;">
-                    <div id="recentColors" style="display:flex; gap:3px;"></div>
+                <div class="color-palette" id="colorPalette">
+                    <button id="colorWheelButton" class="color-wheel-button" onclick="openColorWheel()" title="Colors" aria-label="Open colors">
+                        <span class="color-wheel-dot"></span>
+                    </button>
+                    <div id="recentColors" class="recent-colors"></div>
                 </div>
 
                 <div id="extra-toolbar">
@@ -908,10 +1040,10 @@
         let currentPdfUrl = null;
         // Keep PDF data chunked in IndexedDB so opening large files does not require the whole file in RAM.
         // 4 MB is deliberately kept small for weak tablets while still avoiding excessive range requests.
-        const PDF_CHUNK_SIZE = 4 * 1024 * 1024;
-        const THUMB_SCALE = 0.12;
+        const PDF_CHUNK_SIZE = 8 * 1024 * 1024;
+        const THUMB_SCALE = 0.10;
 
-        const request = indexedDB.open("AppleGlassPDFDB", 3);
+        const request = indexedDB.open("AppleGlassPDFDB", 4);
         request.onupgradeneeded = e => {
             db = e.target.result;
             if (!db.objectStoreNames.contains("files")) {
@@ -928,11 +1060,18 @@
                 const chunks = db.createObjectStore("chunks", { keyPath: ["fileId", "index"] });
                 chunks.createIndex("fileId", "fileId", { unique: false });
             }
+            // Latest portable/flattened PDF. Kept separate from the editable working PDF
+            // so autosave can be portable without baking the same annotations twice.
+            if (!db.objectStoreNames.contains("portable")) {
+                const portable = db.createObjectStore("portable", { keyPath: ["fileId", "index"] });
+                portable.createIndex("fileId", "fileId", { unique: false });
+            }
         };
 
         request.onsuccess = e => {
             db = e.target.result;
             db.onversionchange = () => db.close();
+            navigator.storage?.persist?.().catch(()=>{});
             loadHomeFiles();
             initColorPicker();
         };
@@ -979,6 +1118,60 @@
 
         function getAllChunks(fileId) {
             return idbRequest(db.transaction('chunks', 'readonly').objectStore('chunks').index('fileId').getAll(fileId));
+        }
+
+        function getAllPortableChunks(fileId) {
+            return idbRequest(db.transaction('portable', 'readonly').objectStore('portable').index('fileId').getAll(fileId));
+        }
+
+        async function clearPortablePdf(fileId) {
+            const chunks = await getAllPortableChunks(fileId).catch(() => []);
+            if (!chunks.length) return;
+            const tx = db.transaction('portable', 'readwrite');
+            const store = tx.objectStore('portable');
+            chunks.forEach(c => store.delete([fileId, c.index]));
+            await new Promise((resolve, reject) => {
+                tx.oncomplete = resolve;
+                tx.onerror = e => reject(e.target.error || new Error('Portable PDF delete failed'));
+                tx.onabort = e => reject(e.target.error || new Error('Portable PDF delete aborted'));
+            });
+        }
+
+        async function storePortablePdfInChunks(fileId, file) {
+            const old = await getAllPortableChunks(fileId).catch(() => []);
+            if (old.length) {
+                const clearTx = db.transaction('portable', 'readwrite');
+                const clearStore = clearTx.objectStore('portable');
+                old.forEach(c => clearStore.delete([fileId, c.index]));
+                await new Promise((resolve, reject) => {
+                    clearTx.oncomplete = resolve;
+                    clearTx.onerror = e => reject(e.target.error || new Error('Portable PDF clear failed'));
+                    clearTx.onabort = e => reject(e.target.error || new Error('Portable PDF clear aborted'));
+                });
+            }
+
+            const count = Math.ceil(file.size / PDF_CHUNK_SIZE);
+            for (let i = 0; i < count; i++) {
+                const blob = file.slice(i * PDF_CHUNK_SIZE, Math.min(file.size, (i + 1) * PDF_CHUNK_SIZE), 'application/octet-stream');
+                await idbRequest(db.transaction('portable', 'readwrite').objectStore('portable').put({
+                    fileId, index: i, data: blob, size: blob.size
+                }));
+                if ((i + 1) % 3 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+            }
+        }
+
+        async function assemblePortablePdfBytes(fileId) {
+            const chunks = (await getAllPortableChunks(fileId)).sort((a,b) => a.index - b.index);
+            if (!chunks.length) return null;
+            const total = chunks.reduce((n, c) => n + (c.data?.size || 0), 0);
+            const result = new Uint8Array(total);
+            let offset = 0;
+            for (const c of chunks) {
+                const part = new Uint8Array(await c.data.arrayBuffer());
+                result.set(part, offset);
+                offset += part.byteLength;
+            }
+            return result;
         }
 
         async function storePdfInChunks(fileId, file) {
@@ -1088,7 +1281,7 @@
 
         let currentFileId = null, pdfDoc = null, currentPage = 1;
         let pageOrder = [];
-        let renderQualityScale = ((navigator.deviceMemory || 4) <= 2 ? 0.85 : 1.15);
+        let renderQualityScale = ((navigator.deviceMemory || 4) <= 2 ? 0.95 : Math.min(1.8, Math.max(1.25, (window.devicePixelRatio || 1) * 1.15)));
         let baseScale = ((navigator.deviceMemory || 4) <= 2 ? 1.05 : 1.15), zoomScale = 1.0;
         let currentDrawings = {}, currentTexts = {}, currentImages = {}, currentBookmarks = {};
         let viewMode = 'horizontal';
@@ -1096,6 +1289,10 @@
         let savedPageViewState = {};
         let historyStack = [];
         let recentColorsList = ['#000000', '#333333', '#666666', '#999999', '#cccccc'];
+        let savedColorsList = [];
+        let colorWheelHue = 0;
+        let colorWheelSaturation = 1;
+        let colorWheelValue = 1;
         let activeColor = '#000000';
         let activeTextNode = null;
         let isDrawing = false;
@@ -1110,6 +1307,10 @@
         let saveTimeout;
         let viewSaveTimeout;
         let legacyMigrationDone = false;
+        let portableSaveTimeout = null;
+        let portableSavePromise = null;
+        let currentFileHandle = null;
+        let originalFileWriteErrorShown = false;
 
         async function loadDocumentState(record) {
             currentDrawings = {};
@@ -1123,6 +1324,17 @@
             if (settings) {
                 pageOrder = Array.isArray(settings.pageOrder) ? [...settings.pageOrder] : [];
                 currentBookmarks = settings.bookmarks || {};
+                // v2 bookmarks are keyed by the physical/actual page id, not by display position.
+                // Migrate old display-position bookmarks once so reordering can never detach them.
+                if (settings.bookmarkVersion !== 2) {
+                    const migrated = {};
+                    for (const [displayKey, title] of Object.entries(currentBookmarks)) {
+                        const display = Number(displayKey);
+                        const actual = Number(pageOrder[display - 1] ?? display);
+                        if (actual) migrated[actual] = title;
+                    }
+                    currentBookmarks = migrated;
+                }
                 viewMode = settings.viewMode || 'horizontal';
                 globalPageStyle = settings.globalPageStyle || 'blank';
                 savedPageViewState = settings.pageViewState || {};
@@ -1171,6 +1383,7 @@
                 fileId: currentFileId,
                 pageOrder: [...pageOrder],
                 bookmarks: currentBookmarks,
+                bookmarkVersion: 2,
                 viewMode,
                 globalPageStyle,
                 pageViewState: savedPageViewState
@@ -1220,93 +1433,101 @@
             }
         }
 
+        function getActualPageForDisplay(displayIndex) {
+            return Number(pageOrder[Number(displayIndex) - 1]) || 0;
+        }
+
+        function getDisplayForActual(actualPage) {
+            const idx = pageOrder.indexOf(Number(actualPage));
+            return idx >= 0 ? idx + 1 : 0;
+        }
+
         function toggleCurrentPageBookmark() {
             if (!currentFileId) return;
-            if (!currentBookmarks[currentPage]) {
-                currentBookmarks[currentPage] = `Page ${currentPage} Bookmark`;
+            const actualPage = getActualPageForDisplay(currentPage);
+            if (!actualPage) return;
+            if (!currentBookmarks[actualPage]) {
+                currentBookmarks[actualPage] = `Page ${currentPage} Bookmark`;
             } else {
-                delete currentBookmarks[currentPage];
+                delete currentBookmarks[actualPage];
             }
             updatePageBookmarkUI(currentPage);
             saveDocumentSettings();
             renderSidebarBookmarks();
+            schedulePortablePDFSave();
         }
 
         function updatePageBookmarkUI(displayIndex) {
             const wrapper = document.querySelector(`.page-wrapper[data-page-num="${displayIndex}"]`);
             const btn = document.getElementById('bookmarkToggleBtn');
-            if (!wrapper) return;
+            const actualPage = wrapper ? Number(wrapper.dataset.actualPage) : getActualPageForDisplay(displayIndex);
+            const marked = !!(actualPage && currentBookmarks[actualPage]);
 
-            if (currentBookmarks[displayIndex]) {
-                wrapper.classList.add('bookmarked');
-                if (displayIndex === currentPage && btn) btn.classList.add('active');
-            } else {
-                wrapper.classList.remove('bookmarked');
-                if (displayIndex === currentPage && btn) btn.classList.remove('active');
-            }
+            if (wrapper) wrapper.classList.toggle('bookmarked', marked);
+            const thumb = document.querySelector(`.thumb-item[data-actual-page="${actualPage}"]`);
+            if (thumb) thumb.classList.toggle('bookmarked', marked);
+            if (Number(displayIndex) === Number(currentPage) && btn) btn.classList.toggle('active', marked);
+        }
+
+        function refreshAllBookmarkUI() {
+            pageOrder.forEach((actual, idx) => updatePageBookmarkUI(idx + 1));
         }
 
         function renderSidebarBookmarks() {
             const listContainer = document.getElementById('sidebarBookmarksList');
             if (!listContainer) return;
             listContainer.innerHTML = '';
+            const sidebarTitle = document.querySelector('.sidebar-header h3');
 
-            const pagesWithBookmarks = Object.keys(currentBookmarks).map(Number).sort((a,b) => a - b);
-            
-            if (pagesWithBookmarks.length === 0) {
-                listContainer.innerHTML = `<div style="text-align: center; color: #8e8e93; font-size: 13px; margin-top: 30px;">No bookmarks yet.<br>Click the bookmark icon on any page to add one.</div>`;
+            const actualPages = Object.keys(currentBookmarks).map(Number)
+                .filter(actual => getDisplayForActual(actual) > 0)
+                .sort((a,b) => getDisplayForActual(a) - getDisplayForActual(b));
+
+            if (sidebarTitle) sidebarTitle.dataset.count = actualPages.length ? String(actualPages.length) : '';
+            if (actualPages.length === 0) {
+                listContainer.innerHTML = `<div class="bookmark-empty">No bookmarks yet.<br><span>Click the bookmark icon on any page to add one.</span></div>`;
                 return;
             }
 
-            pagesWithBookmarks.forEach(pNum => {
-                const title = currentBookmarks[pNum];
+            actualPages.forEach(actualPage => {
+                const displayPage = getDisplayForActual(actualPage);
+                const title = currentBookmarks[actualPage];
                 const item = document.createElement('div');
-                item.className = 'bookmark-item';
-
+                item.className = 'bookmark-item' + (displayPage === currentPage ? ' current' : '');
                 const info = document.createElement('div');
                 info.className = 'bookmark-info';
-
                 const titleEl = document.createElement('div');
                 titleEl.className = 'bookmark-title';
                 titleEl.contentEditable = true;
                 titleEl.innerText = title;
                 titleEl.onblur = () => {
-                    currentBookmarks[pNum] = titleEl.innerText || `Page ${pNum}`;
+                    currentBookmarks[actualPage] = titleEl.innerText || `Page ${displayPage}`;
                     saveDocumentSettings();
                 };
-
                 const pageEl = document.createElement('div');
                 pageEl.className = 'bookmark-page';
-                pageEl.innerText = `Page ${pNum}`;
-
-                info.appendChild(titleEl);
-                info.appendChild(pageEl);
-
+                pageEl.innerText = `Page ${displayPage}`;
+                info.append(titleEl, pageEl);
                 const actions = document.createElement('div');
                 actions.className = 'bookmark-actions';
-
                 const delBtn = document.createElement('button');
                 delBtn.className = 'bookmark-delete';
                 delBtn.innerHTML = '✕';
-                delBtn.onclick = (e) => {
+                delBtn.onclick = e => {
                     e.stopPropagation();
-                    delete currentBookmarks[pNum];
-                    updatePageBookmarkUI(pNum);
+                    delete currentBookmarks[actualPage];
+                    refreshAllBookmarkUI();
                     saveDocumentSettings();
                     renderSidebarBookmarks();
                 };
-
                 actions.appendChild(delBtn);
-
-                item.appendChild(info);
-                item.appendChild(actions);
-
-                item.onclick = (e) => {
+                item.append(info, actions);
+                item.onclick = e => {
                     if (e.target === titleEl || e.target.closest('.bookmark-title')) return;
-                    goToPage(pNum);
+                    const latestDisplay = getDisplayForActual(actualPage);
+                    if (latestDisplay) goToPage(latestDisplay);
                     toggleSidebar(false);
                 };
-
                 listContainer.appendChild(item);
             });
         }
@@ -1370,25 +1591,55 @@
             }
         }
 
-        function initColorPicker() {
-            const picker = document.getElementById('colorPicker');
-            if (picker) {
-                picker.addEventListener('change', (e) => selectColor(e.target.value));
-            }
-            renderRecentColors();
+        const COLOR_STORAGE_KEY = 'zaker_saved_colors_v2';
+        const MAX_SAVED_COLORS = 100;
+        const LARGE_PDF_FLATTEN_LIMIT = 650 * 1024 * 1024;
+        const MAX_RECENT_COLORS = 6;
+
+        function normalizeHex(hex) {
+            let value = String(hex || '').trim().replace('#','');
+            if (/^[0-9a-fA-F]{3}$/.test(value)) value = value.split('').map(c => c + c).join('');
+            if (!/^[0-9a-fA-F]{6}$/.test(value)) return null;
+            return '#' + value.toUpperCase();
         }
 
-        function selectColor(hex) {
-            activeColor = hex;
-            const picker = document.getElementById('colorPicker');
-            if (picker) picker.value = hex;
-            recentColorsList = recentColorsList.filter(c => c.toLowerCase() !== hex.toLowerCase());
-            recentColorsList.unshift(hex);
-            if (recentColorsList.length > 5) recentColorsList.pop();
+        function loadSavedColors() {
+            try {
+                const parsed = JSON.parse(localStorage.getItem(COLOR_STORAGE_KEY) || '[]');
+                savedColorsList = Array.isArray(parsed) ? parsed.map(normalizeHex).filter(Boolean).slice(0, MAX_SAVED_COLORS) : [];
+            } catch (_) { savedColorsList = []; }
+        }
+
+        function persistSavedColors() {
+            try { localStorage.setItem(COLOR_STORAGE_KEY, JSON.stringify(savedColorsList)); } catch (_) {}
+        }
+
+        function initColorPicker() {
+            loadSavedColors();
             renderRecentColors();
+            renderColorModal();
+            syncColorEditorFromHex(activeColor);
+            const wheelDot = document.querySelector('.color-wheel-button .color-wheel-dot');
+            if (wheelDot) wheelDot.style.backgroundColor = activeColor;
+        }
+
+        function selectColor(hex, saveToRecent = true) {
+            const normalized = normalizeHex(hex);
+            if (!normalized) return;
+            activeColor = normalized;
+            if (saveToRecent) {
+                recentColorsList = recentColorsList.filter(c => c.toLowerCase() !== normalized.toLowerCase());
+                recentColorsList.unshift(normalized);
+                if (recentColorsList.length > MAX_RECENT_COLORS) recentColorsList.length = MAX_RECENT_COLORS;
+            }
+            renderRecentColors();
+            renderColorModal();
+            syncColorEditorFromHex(normalized);
+            const wheelDot = document.querySelector('.color-wheel-button .color-wheel-dot');
+            if (wheelDot) wheelDot.style.backgroundColor = normalized;
 
             if (activeTextNode) {
-                activeTextNode.style.color = hex;
+                activeTextNode.style.color = normalized;
                 if (typeof savePageData === 'function') savePageData(currentPage);
             }
         }
@@ -1397,14 +1648,143 @@
             const container = document.getElementById('recentColors');
             if (!container) return;
             container.innerHTML = '';
-            recentColorsList.forEach(color => {
-                const swatch = document.createElement('div');
+            recentColorsList.slice(0, MAX_RECENT_COLORS).forEach(color => {
+                const swatch = document.createElement('button');
+                swatch.type = 'button';
                 swatch.className = 'recent-color-swatch';
                 swatch.style.backgroundColor = color;
+                swatch.title = color;
                 swatch.onclick = () => selectColor(color);
                 container.appendChild(swatch);
             });
         }
+
+        function openColorWheel() {
+            const overlay = document.getElementById('color-modal-overlay');
+            if (!overlay) return;
+            overlay.classList.add('show');
+            syncColorEditorFromHex(activeColor);
+            renderColorModal();
+        }
+
+        function closeColorWheel(e) {
+            if (e && e.target && e.target.id !== 'color-modal-overlay') return;
+            document.getElementById('color-modal-overlay')?.classList.remove('show');
+        }
+
+        function rgbToHex(r,g,b) {
+            return '#' + [r,g,b].map(v => Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('').toUpperCase();
+        }
+
+        function hsvToHex(h,s,v) {
+            h = ((h % 360) + 360) % 360; s = Math.max(0,Math.min(1,s)); v = Math.max(0,Math.min(1,v));
+            const c=v*s, x=c*(1-Math.abs((h/60)%2-1)), m=v-c;
+            let r=0,g=0,b=0;
+            if(h<60){r=c;g=x;} else if(h<120){r=x;g=c;} else if(h<180){g=c;b=x;}
+            else if(h<240){g=x;b=c;} else if(h<300){r=x;b=c;} else {r=c;b=x;}
+            return rgbToHex((r+m)*255,(g+m)*255,(b+m)*255);
+        }
+
+        function hexToHsv(hex) {
+            const n = normalizeHex(hex) || '#000000';
+            const r=parseInt(n.slice(1,3),16)/255,g=parseInt(n.slice(3,5),16)/255,b=parseInt(n.slice(5,7),16)/255;
+            const max=Math.max(r,g,b), min=Math.min(r,g,b), d=max-min;
+            let h=0;
+            if(d){ if(max===r) h=60*((g-b)/d%6); else if(max===g) h=60*((b-r)/d+2); else h=60*((r-g)/d+4); }
+            const s=max===0?0:d/max;
+            return {h:(h+360)%360,s,v:max};
+        }
+
+        function syncColorEditorFromHex(hex) {
+            const normalized = normalizeHex(hex) || '#000000';
+            const hsv = hexToHsv(normalized);
+            colorWheelHue = hsv.h; colorWheelSaturation = hsv.s; colorWheelValue = hsv.v;
+            const input=document.getElementById('colorHexInput');
+            if(input) input.value=normalized;
+            updateColorEditor();
+        }
+
+        function updateColorEditor() {
+            const wheel=document.getElementById('colorWheel');
+            const sv=document.getElementById('colorSV');
+            const preview=document.getElementById('colorPreview');
+            const input=document.getElementById('colorHexInput');
+            const hex=hsvToHex(colorWheelHue,colorWheelSaturation,colorWheelValue);
+            activeColor=hex;
+            if(wheel){
+                const angle=(colorWheelHue-90)*Math.PI/180, r=88;
+                const cx=105+Math.cos(angle)*r, cy=105+Math.sin(angle)*r;
+                const marker=wheel.querySelector('.color-wheel-center');
+                if(marker){marker.style.left=cx+'px';marker.style.top=cy+'px';}
+            }
+            if(sv){
+                const hueColor=hsvToHex(colorWheelHue,1,1);
+                sv.style.background=`linear-gradient(to top,#000,transparent),linear-gradient(to right,#fff,${hueColor})`;
+                sv.style.setProperty('--sv-x',(colorWheelSaturation*100)+'%');
+                sv.style.setProperty('--sv-y',((1-colorWheelValue)*100)+'%');
+            }
+            if(preview) preview.style.backgroundColor=hex;
+            if(input && document.activeElement!==input) input.value=hex;
+        }
+
+        function handleColorWheelPointer(e) {
+            const wheel=document.getElementById('colorWheel'); if(!wheel)return;
+            const r=wheel.getBoundingClientRect(), x=e.clientX-r.left-r.width/2, y=e.clientY-r.top-r.height/2;
+            const distance=Math.sqrt(x*x+y*y);
+            if(distance < r.width*.38 || distance > r.width*.52) return;
+            colorWheelHue=(Math.atan2(y,x)*180/Math.PI+90+360)%360;
+            updateColorEditor();
+        }
+
+        function handleColorSVPointer(e) {
+            const sv=document.getElementById('colorSV'); if(!sv)return;
+            const r=sv.getBoundingClientRect();
+            colorWheelSaturation=Math.max(0,Math.min(1,(e.clientX-r.left)/r.width));
+            colorWheelValue=1-Math.max(0,Math.min(1,(e.clientY-r.top)/r.height));
+            updateColorEditor();
+        }
+
+        function saveActiveColor() {
+            const input=document.getElementById('colorHexInput');
+            const normalized=normalizeHex(input?.value) || normalizeHex(activeColor) || '#000000';
+            selectColor(normalized);
+            savedColorsList=savedColorsList.filter(c=>c.toLowerCase()!==normalized.toLowerCase());
+            savedColorsList.unshift(normalized);
+            if(savedColorsList.length>MAX_SAVED_COLORS)savedColorsList.length=MAX_SAVED_COLORS;
+            persistSavedColors();
+            renderColorModal();
+        }
+
+        function renderColorModal() {
+            const recent=document.getElementById('modalRecentColors'), saved=document.getElementById('savedColors'), count=document.getElementById('savedColorCount');
+            if(count) count.textContent=`${savedColorsList.length} saved`;
+            if(recent){
+                recent.innerHTML='';
+                recentColorsList.slice(0,MAX_RECENT_COLORS).forEach(color=>recent.appendChild(makeColorButton(color)));
+            }
+            if(saved){
+                saved.innerHTML='';
+                savedColorsList.forEach(color=>saved.appendChild(makeColorButton(color)));
+            }
+        }
+
+        function makeColorButton(color) {
+            const b=document.createElement('button'); b.type='button'; b.style.backgroundColor=color; b.title=color;
+            b.onclick=()=>selectColor(color); return b;
+        }
+
+        function clearSavedColors() {
+            if(!savedColorsList.length) return;
+            if(!confirm('Clear all saved colors?')) return;
+            savedColorsList=[]; persistSavedColors(); renderColorModal();
+        }
+
+        document.addEventListener('DOMContentLoaded',()=>{
+            const wheel=document.getElementById('colorWheel'), sv=document.getElementById('colorSV'), input=document.getElementById('colorHexInput');
+            if(wheel) wheel.addEventListener('pointerdown',handleColorWheelPointer);
+            if(sv) sv.addEventListener('pointerdown',handleColorSVPointer);
+            if(input) input.addEventListener('input',()=>{const h=normalizeHex(input.value);if(h)syncColorEditorFromHex(h);});
+        });
 
         async function loadHomeFiles() {
             const grid = document.getElementById('notesGrid');
@@ -1413,7 +1793,7 @@
             try {
                 const files = await idbRequest(db.transaction('files', 'readonly').objectStore('files').getAll());
                 files.sort((a, b) => String(a.name).localeCompare(String(b.name), undefined, { numeric: true }));
-                files.forEach(f => {
+                files.filter(f => !f.deleted).forEach(f => {
                     const card = document.createElement('div');
                     card.className = 'note-card apple-glass';
                     const del = document.createElement('button');
@@ -1440,17 +1820,15 @@
             e.stopPropagation();
             if (!confirm("Are you sure you want to delete this document?")) return;
             try {
-                await deleteAllChunks(id).catch(() => {});
-                const pageStates = await getAllPageStates(id).catch(() => []);
-                const tx = db.transaction(['files', 'pages', 'settings'], 'readwrite');
-                tx.objectStore('files').delete(id);
-                pageStates.forEach(state => tx.objectStore('pages').delete([id, state.page]));
-                tx.objectStore('settings').delete(id);
-                await new Promise((resolve, reject) => {
-                    tx.oncomplete = resolve;
-                    tx.onerror = e2 => reject(e2.target.error);
-                    tx.onabort = e2 => reject(e2.target.error || new Error('Delete aborted'));
-                });
+                // Soft-delete only. Keep the editable PDF, annotations, settings and
+                // portable copy so re-adding the same original PDF restores everything.
+                const record = await getRecord(id);
+                if (!record) return;
+                currentFileHandle = record.fileHandle || null;
+                originalFileWriteErrorShown = false;
+                record.deleted = true;
+                record.deletedAt = Date.now();
+                await putRecord(record);
                 if (currentFileId === id) {
                     currentFileId = null;
                     if (currentPdfUrl) { URL.revokeObjectURL(currentPdfUrl); currentPdfUrl = null; }
@@ -1468,6 +1846,7 @@
                     savePageDataNow(currentPage).catch(() => {}),
                     saveDocumentSettings().catch(() => {})
                 ]);
+                await savePortablePDF().catch(() => {});
             }
             if (typeof toggleEditMode === 'function') toggleEditMode(false);
             document.getElementById('editor-screen').style.display = 'none';
@@ -1478,47 +1857,75 @@
             loadHomeFiles();
         }
 
-        document.getElementById('pdfUploader')?.addEventListener('change', async e => {
-            const file = e.target.files[0];
-            e.target.value = '';
-            if (!file) return;
-            if (file.type !== 'application/pdf') {
-                alert('Please select a PDF file.');
-                return;
+        async function pdfFingerprint(file) {
+            const bytes = await file.arrayBuffer();
+            const hash = await crypto.subtle.digest('SHA-256', bytes);
+            return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        async function ensureHandlePermission(handle, request=false) {
+            if (!handle) return false;
+            const opts={mode:'readwrite'};
+            try {
+                if ((await handle.queryPermission?.(opts)) === 'granted') return true;
+                if (request && (await handle.requestPermission?.(opts)) === 'granted') return true;
+            } catch(_) {}
+            return false;
+        }
+
+        async function openPdfSmart() {
+            if (window.showOpenFilePicker) {
+                try {
+                    const [handle] = await window.showOpenFilePicker({
+                        multiple:false,
+                        types:[{description:'PDF document',accept:{'application/pdf':['.pdf']}}]
+                    });
+                    if (!handle) return;
+                    await ensureHandlePermission(handle, true);
+                    const file = await handle.getFile();
+                    await importPdfFile(file, handle);
+                    return;
+                } catch(err) {
+                    if (err?.name === 'AbortError') return;
+                    console.warn('Direct file picker unavailable, falling back:', err);
+                }
             }
+            document.getElementById('pdfUploader')?.click();
+        }
 
-            const id = 'pdf_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-            const record = {
-                id,
-                name: file.name,
-                size: file.size,
-                chunked: true,
-                chunkSize: PDF_CHUNK_SIZE,
-                createdAt: Date.now()
-            };
-
+        async function importPdfFile(file, fileHandle=null) {
+            if (!file) return;
+            if (file.type !== 'application/pdf' && !file.name.toLowerCase().endsWith('.pdf')) {
+                alert('Please select a PDF file.'); return;
+            }
+            const fingerprint = await pdfFingerprint(file);
+            const existingFiles = await idbRequest(db.transaction('files','readonly').objectStore('files').getAll());
+            const existing = existingFiles.find(f => f.fingerprint===fingerprint || f.latestWrittenFingerprint===fingerprint);
+            if (existing) {
+                existing.deleted=false; existing.deletedAt=null; existing.lastReaddedAt=Date.now();
+                if(fileHandle) existing.fileHandle=fileHandle;
+                await putRecord(existing);
+                await openPDF(existing.id); loadHomeFiles(); return;
+            }
+            const id='pdf_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+            const record={id,name:file.name,size:file.size,fingerprint,latestWrittenFingerprint:fingerprint,deleted:false,chunked:true,chunkSize:PDF_CHUNK_SIZE,createdAt:Date.now()};
+            if(fileHandle) record.fileHandle=fileHandle;
             try {
                 updateAutosaveIndicator('saving');
-                await putRecord(record);
-                await storePdfInChunks(id, file);
-                await putSettings({
-                    fileId: id,
-                    pageOrder: [],
-                    bookmarks: {},
-                    viewMode: 'horizontal',
-                    globalPageStyle: 'blank',
-                    pageViewState: {}
-                });
-                await openPDF(id);
-                loadHomeFiles();
-            } catch (err) {
-                console.error('PDF upload failed:', err);
-                try { await deleteAllChunks(id); } catch (_) {}
-                try { await idbRequest(db.transaction('files', 'readwrite').objectStore('files').delete(id)); } catch (_) {}
-                alert('Could not save this PDF: ' + (err?.message || err));
-            } finally {
-                updateAutosaveIndicator('saved');
-            }
+                await putRecord(record); await storePdfInChunks(id,file);
+                await putSettings({fileId:id,pageOrder:[],bookmarks:{},bookmarkVersion:2,viewMode:'horizontal',globalPageStyle:'blank',pageViewState:{}});
+                await openPDF(id); await savePortablePDF().catch(()=>{}); loadHomeFiles();
+            } catch(err) {
+                console.error('PDF upload failed:',err);
+                try{await deleteAllChunks(id)}catch(_){};
+                try{await idbRequest(db.transaction('files','readwrite').objectStore('files').delete(id))}catch(_){};
+                alert('Could not save this PDF: '+(err?.message||err));
+            } finally { updateAutosaveIndicator('saved'); }
+        }
+
+        document.getElementById('pdfUploader')?.addEventListener('change', async e => {
+            const file=e.target.files[0]; e.target.value='';
+            if(file) await importPdfFile(file,null);
         });
 
         async function openPDF(id) {
@@ -1526,6 +1933,8 @@
                 currentFileId = id;
                 const record = await getRecord(id);
                 if (!record) return;
+                currentFileHandle = record.fileHandle || null;
+                originalFileWriteErrorShown = false;
 
                 await loadDocumentState(record);
                 await openPdfForRecord(record);
@@ -1547,6 +1956,7 @@
                     fileId: id,
                     pageOrder: [...pageOrder],
                     bookmarks: currentBookmarks,
+                    bookmarkVersion: 2,
                     viewMode,
                     globalPageStyle,
                     pageViewState: savedPageViewState
@@ -1583,16 +1993,16 @@
             currentImages = shiftDict(currentImages);
         }
 
-        function shiftBookmarks(displayPage, direction) {
+        function shiftBookmarks(actualPage, direction) {
             const next = {};
             for (const key in currentBookmarks) {
                 const k = Number(key);
                 if (direction === 'insert') {
-                    if (k >= displayPage) next[k + 1] = currentBookmarks[key];
+                    if (k >= actualPage) next[k + 1] = currentBookmarks[key];
                     else next[k] = currentBookmarks[key];
                 } else if (direction === 'delete') {
-                    if (k > displayPage) next[k - 1] = currentBookmarks[key];
-                    else if (k < displayPage) next[k] = currentBookmarks[key];
+                    if (k > actualPage) next[k - 1] = currentBookmarks[key];
+                    else if (k < actualPage) next[k] = currentBookmarks[key];
                 }
             }
             currentBookmarks = next;
@@ -1622,7 +2032,7 @@
                     if (pageOrder[i] >= newActualPageNum) pageOrder[i]++;
                 }
                 pageOrder.splice(currentPage, 0, newActualPageNum);
-                shiftBookmarks(currentPage + 1, 'insert');
+                shiftBookmarks(newActualPageNum, 'insert');
 
                 await deleteAllChunks(currentFileId).catch(() => {});
                 await storePdfInChunks(currentFileId, new Blob([newPdfBytes], { type: 'application/pdf' }));
@@ -1631,6 +2041,7 @@
                 record.chunkSize = PDF_CHUNK_SIZE;
                 delete record.data;
                 await putRecord(record);
+                await clearPortablePdf(currentFileId).catch(() => {});
                 await replaceAllPageStates(currentFileId);
 
                 await openPdfForRecord(record);
@@ -1638,6 +2049,7 @@
                 initVirtualViewer();
                 await goToPage(currentPage);
                 await saveDocumentSettings();
+                toggleEditMode(false);
                 updateAutosaveIndicator('saved');
             } catch (error) {
                 console.error(error);
@@ -1675,7 +2087,7 @@
                     if (pageOrder[i] > actualToRemove) pageOrder[i]--;
                 }
                 shiftAnnotations(actualToRemove, 'delete');
-                shiftBookmarks(pageIndex, 'delete');
+                shiftBookmarks(actualToRemove, 'delete');
 
                 await deleteAllChunks(currentFileId).catch(() => {});
                 await storePdfInChunks(currentFileId, new Blob([newPdfBytes], { type: 'application/pdf' }));
@@ -1684,6 +2096,7 @@
                 record.chunkSize = PDF_CHUNK_SIZE;
                 delete record.data;
                 await putRecord(record);
+                await clearPortablePdf(currentFileId).catch(() => {});
 
                 if (currentPage > pageOrder.length) currentPage = pageOrder.length;
                 await replaceAllPageStates(currentFileId);
@@ -1719,6 +2132,8 @@
                 if (typeof updatePageDisplay === 'function') updatePageDisplay();
             }
             if (typeof applyZoomTransform === 'function') applyZoomTransform();
+            if (viewMode === 'vertical') requestAnimationFrame(() => goToPage(currentPage));
+            syncActiveThumbnail(true);
             scheduleDocumentSettingsSave();
         }
 
@@ -1726,6 +2141,7 @@
             const container = document.getElementById('viewer-container');
             const thumbsContainer = document.getElementById('thumbnailsContainer');
             if (!container || !thumbsContainer) return;
+            installVerticalPageSync();
             container.innerHTML = '';
             thumbsContainer.innerHTML = '';
             renderedPages.clear();
@@ -1755,7 +2171,7 @@
                         }
                     }
                 });
-            }, { root: container, rootMargin: ((navigator.deviceMemory || 4) <= 2 ? '140px 120px' : '260px 220px') }); // زيادة مساحة التتبع لضمان سلاسة السحب في كل الاتجاهات
+            }, { root: container, rootMargin: ((navigator.deviceMemory || 4) <= 2 ? '90px 80px' : '180px 140px') }); // زيادة مساحة التتبع لضمان سلاسة السحب في كل الاتجاهات
 
             for (let index = 0; index < pageOrder.length; index++) {
                 const actualPageNum = pageOrder[index];
@@ -1769,7 +2185,7 @@
                 // إضافة البوكمارك الحمراء على الصفحة من فوق وتحتها ظل
                 const bookmarkBadge = document.createElement('div');
                 bookmarkBadge.className = 'page-bookmark-badge';
-                bookmarkBadge.innerHTML = '🔖';
+                bookmarkBadge.innerHTML = '';
                 bookmarkBadge.onclick = () => {
                     if (typeof goToPage === 'function') goToPage(displayIndex);
                     toggleSidebar(true);
@@ -1801,7 +2217,7 @@
             const page = await pdfDoc.getPage(actualPageNum);
             const viewport = page.getViewport({ scale: baseScale });
             let quality = renderQualityScale;
-            const maxPixels = ((navigator.deviceMemory || 4) <= 2 ? 1900000 : 3200000);
+            const maxPixels = ((navigator.deviceMemory || 4) <= 2 ? 2200000 : 6000000);
             const wantedPixels = viewport.width * viewport.height * quality * quality;
             if (wantedPixels > maxPixels) quality = Math.sqrt(maxPixels / (viewport.width * viewport.height));
             const hdViewport = page.getViewport({ scale: baseScale * quality });
@@ -1891,8 +2307,13 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
             pageNumBadge.className = 'thumb-page-num';
             pageNumBadge.textContent = displayIndex;
 
+            const thumbBookmarkBadge = document.createElement('div');
+            thumbBookmarkBadge.className = 'thumb-bookmark-badge';
+            thumbBookmarkBadge.textContent = '';
             thumbItem.appendChild(deleteBadge);
+            thumbItem.appendChild(thumbBookmarkBadge);
             thumbItem.appendChild(pageNumBadge);
+            if (currentBookmarks[actualPageNum]) thumbItem.classList.add('bookmarked');
             thumbsContainer.appendChild(thumbItem);
 
             setupDragAndDrop(thumbItem);
@@ -2027,54 +2448,70 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
         }
 
         function toggleEditMode(enable) {
-            isEditMode = enable;
+            isEditMode = !!enable;
             const container = document.getElementById('thumbnailsContainer');
             if (!container) return;
-            if (enable) {
-                container.classList.add('edit-mode');
-            } else {
-                container.classList.remove('edit-mode');
+            container.classList.toggle('edit-mode', isEditMode);
+            if (!isEditMode && longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
             }
         }
 
-        function updateThumbnailsAndPagesIndexes() {
-            const thumbs = document.querySelectorAll('.thumb-item');
-            const newOrder = [];
-            
-            thumbs.forEach((thumb, idx) => {
-                const newDisplayIndex = idx + 1;
-                const actualPage = parseInt(thumb.dataset.actualPage);
-                
-                thumb.dataset.pageNum = newDisplayIndex;
-                const badge = thumb.querySelector('.thumb-page-num');
-                if (badge) badge.textContent = newDisplayIndex;
+        document.addEventListener('pointerdown', (e) => {
+            if (!isEditMode) return;
+            const insideThumb = e.target.closest('#thumbnailsContainer .thumb-item');
+            const insideThumbBar = e.target.closest('#bottom-thumbnails-bar');
+            if (!insideThumb && !insideThumbBar) toggleEditMode(false);
+        }, true);
 
-                if (newDisplayIndex === currentPage) {
-                    thumb.classList.add('active');
-                } else {
-                    thumb.classList.remove('active');
-                }
-
-                newOrder.push(actualPage);
-            });
-
-            pageOrder = newOrder;
-
-            const container = document.getElementById('viewer-container');
-            if (container) {
-                pageOrder.forEach((actualPage, idx) => {
-                    const newDisplayIndex = idx + 1;
-                    const wrapper = container.querySelector(`.page-wrapper[data-actual-page="${actualPage}"]`);
-                    if (wrapper) {
-                        wrapper.dataset.pageNum = newDisplayIndex;
-                        if (typeof updatePageBookmarkUI === 'function') updatePageBookmarkUI(newDisplayIndex);
-                    }
+        async function captureRenderedPageStatesNow() {
+            if (!currentFileId || !db) return;
+            const wrappers = [...document.querySelectorAll('.page-wrapper[data-actual-page]')];
+            for (const wrapper of wrappers) {
+                if (wrapper.dataset.rendered !== 'true') continue;
+                const actualPage = Number(wrapper.dataset.actualPage);
+                const drawCanvas = wrapper.querySelector('.draw-canvas');
+                if (drawCanvas) currentDrawings[actualPage] = drawCanvas.toDataURL('image/png');
+                const texts = [];
+                wrapper.querySelectorAll('.text-node-wrapper').forEach(w => {
+                    const n = w.querySelector('.text-node');
+                    if (n) texts.push({text:n.innerText,x:parseFloat(w.dataset.baseX)||0,y:parseFloat(w.dataset.baseY)||0,color:n.style.color||activeColor,fontSize:parseFloat(n.style.fontSize)||18});
                 });
+                currentTexts[actualPage] = texts;
+                const images = [];
+                wrapper.querySelectorAll('.img-node').forEach(n => {
+                    const img=n.querySelector('img');
+                    if(img) images.push({src:img.src,x:parseFloat(n.dataset.baseX)||0,y:parseFloat(n.dataset.baseY)||0,w:parseFloat(n.style.width)||150,h:parseFloat(n.style.height)||150});
+                });
+                currentImages[actualPage] = images;
+                await putPageState({fileId:currentFileId,page:actualPage,drawings:currentDrawings[actualPage]||null,texts,images});
             }
+        }
 
-            reorderDOMPages();
-            savePageOrder();
-            updatePageDisplay();
+        async function updateThumbnailsAndPagesIndexes() {
+            await captureRenderedPageStatesNow();
+            const activeActualPage = Number(pageOrder[currentPage - 1]) || 0;
+            const thumbs = [...document.querySelectorAll('.thumb-item')];
+            const newOrder = thumbs.map(thumb => Number(thumb.dataset.actualPage)).filter(Boolean);
+            pageOrder = newOrder;
+            if (activeActualPage) {
+                const nextIndex = pageOrder.indexOf(activeActualPage);
+                currentPage = nextIndex >= 0 ? nextIndex + 1 : Math.min(currentPage, pageOrder.length);
+            }
+            thumbs.forEach((thumb, idx) => {
+                const display = idx + 1;
+                thumb.dataset.pageNum = display;
+                const badge = thumb.querySelector('.thumb-page-num');
+                if (badge) badge.textContent = display;
+                thumb.classList.toggle('active', display === currentPage);
+                thumb.classList.toggle('bookmarked', !!currentBookmarks[Number(thumb.dataset.actualPage)]);
+            });
+            await saveDocumentSettings();
+            // Rebuild the viewer so every draw/text/image event is rebound to the page's actual identity.
+            initVirtualViewer();
+            renderSidebarBookmarks();
+            schedulePortablePDFSave();
         }
 
         function reorderDOMPages() {
@@ -2094,9 +2531,9 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
                 e.dataTransfer.setData('text/plain', thumb.dataset.actualPage);
             });
 
-            thumb.addEventListener('dragend', () => {
+            thumb.addEventListener('dragend', async () => {
                 thumb.classList.remove('dragging');
-                updateThumbnailsAndPagesIndexes();
+                await updateThumbnailsAndPagesIndexes();
             });
 
             thumb.addEventListener('dragover', (e) => {
@@ -2143,6 +2580,7 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
                 fileId: currentFileId,
                 pageOrder: [...pageOrder],
                 bookmarks: currentBookmarks,
+                bookmarkVersion: 2,
                 viewMode,
                 globalPageStyle,
                 pageViewState: savedPageViewState
@@ -2216,6 +2654,22 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
             await Promise.all(tasks);
         }
 
+        function syncActiveThumbnail(instant = false) {
+            const container = document.getElementById('thumbnailsContainer');
+            if (!container) return;
+            const thumbs = container.querySelectorAll('.thumb-item');
+            let activeThumb = null;
+            thumbs.forEach(thumb => {
+                const active = Number(thumb.dataset.pageNum) === Number(currentPage);
+                thumb.classList.toggle('active', active);
+                if (active) activeThumb = thumb;
+            });
+            if (!activeThumb) return;
+            const target = activeThumb.offsetLeft - (container.clientWidth - activeThumb.offsetWidth) / 2;
+            const max = Math.max(0, container.scrollWidth - container.clientWidth);
+            container.scrollTo({left:Math.max(0,Math.min(max,target)), behavior:instant ? 'auto' : ((navigator.deviceMemory || 4) <= 2 ? 'auto' : 'smooth')});
+        }
+
         function goToPage(pageNum) {
             if (!pdfDoc || pageNum < 1 || pageNum > pageOrder.length) return;
             const previousPage = currentPage;
@@ -2230,7 +2684,8 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
 
             if (targetWrapper && container) {
                 if (viewMode === 'vertical') {
-                    targetWrapper.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+                    const top = Math.max(0, targetWrapper.offsetTop - 12);
+                    container.scrollTo({top, behavior: ((navigator.deviceMemory || 4) <= 2 ? 'auto' : 'smooth')});
                 } else {
                     updatePageDisplay();
                     requestAnimationFrame(() => {
@@ -2243,13 +2698,7 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
             const bookmarkBtn = document.getElementById('bookmarkToggleBtn');
             if (bookmarkBtn) bookmarkBtn.classList.toggle('active', !!currentBookmarks[currentPage]);
 
-            const thumbs = document.querySelectorAll('.thumb-item');
-            thumbs.forEach(thumb => {
-                const pNum = parseInt(thumb.dataset.pageNum);
-                const active = pNum === currentPage;
-                thumb.classList.toggle('active', active);
-                if (active) thumb.scrollIntoView({ behavior: ((navigator.deviceMemory || 4) <= 2 ? 'auto' : 'smooth'), block: 'nearest', inline: 'center' });
-            });
+            syncActiveThumbnail();
 
             const pageState = savedPageViewState[currentPage] || {};
             if (Number.isFinite(Number(pageState.zoomScale))) {
@@ -2261,6 +2710,35 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
 
         function changePage(dir) {
             goToPage(currentPage + dir);
+        }
+
+        let verticalPageSyncRaf = 0;
+        function installVerticalPageSync() {
+            const container = document.getElementById('viewer-container');
+            if (!container || container.dataset.pageSyncInstalled === '1') return;
+            container.dataset.pageSyncInstalled = '1';
+            container.addEventListener('scroll', () => {
+                if (viewMode !== 'vertical') return;
+                if (verticalPageSyncRaf) return;
+                verticalPageSyncRaf = requestAnimationFrame(() => {
+                    verticalPageSyncRaf = 0;
+                    const pages = container.querySelectorAll('.page-wrapper');
+                    if (!pages.length) return;
+                    const viewportMid = container.scrollTop + container.clientHeight * 0.38;
+                    let best = currentPage, bestDist = Infinity;
+                    pages.forEach(p => {
+                        const center = p.offsetTop + p.offsetHeight / 2;
+                        const dist = Math.abs(center - viewportMid);
+                        if (dist < bestDist) { bestDist = dist; best = Number(p.dataset.pageNum); }
+                    });
+                    if (best !== currentPage) {
+                        currentPage = best;
+                        document.getElementById('bookmarkToggleBtn')?.classList.toggle('active', !!currentBookmarks[currentPage]);
+                        syncActiveThumbnail(true);
+                        scheduleDocumentSettingsSave();
+                    }
+                });
+            }, {passive:true});
         }
 
         function updatePageDisplay() {
@@ -2455,45 +2933,80 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
         const eraserCursor = document.getElementById('eraser-cursor');
 
         function initDrawingEvents(canvas, displayIndex, actualPageNum) {
-            const ctx=canvas.getContext('2d',{alpha:true,desynchronized:true});
-            const getPos=e=>{const r=canvas.getBoundingClientRect();return{x:(e.clientX-r.left)*(canvas.width/r.width),y:(e.clientY-r.top)*(canvas.height/r.height)}};
-            let points=[],drawing=false;
-            const finish=()=>{
-                if(!drawing)return;
-                drawing=false;points=[];ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
-                if(eraserCursor)eraserCursor.style.display='none';
-                savePageData(displayIndex);
+            const ctx = canvas.getContext('2d', { alpha:true, desynchronized:true });
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            const getPos = e => {
+                const r = canvas.getBoundingClientRect();
+                return { x:(e.clientX-r.left)*(canvas.width/r.width), y:(e.clientY-r.top)*(canvas.height/r.height) };
             };
-            canvas.onpointerdown=e=>{
-                if(!currentTool)return;
-                startTouch();
-                if(currentTool==='text'){
-                    const rect=canvas.parentElement.getBoundingClientRect();const fontSize=toolSizes.text||18;const bw=+(canvas.parentElement.dataset.baseWidth||600),bh=+(canvas.parentElement.dataset.baseHeight||800);
-                    createTextNode(((e.clientX-rect.left)/rect.width)*bw,((e.clientY-rect.top)/rect.height)*bh,'Type here...',activeColor,canvas.parentElement,displayIndex,fontSize);savePageData(displayIndex);return;
-                }
-                if(!['pen','eraser','highlighter'].includes(currentTool))return;
-                redoStack=[];
-                historyStack.push({pageNum:displayIndex,dataUrl:canvas.toDataURL('image/png')});if(historyStack.length>12)historyStack.shift();
-                drawing=true;canvas.setPointerCapture?.(e.pointerId);const p=getPos(e);points=[p];
-                const factor=baseScale*renderQualityScale;const size=(toolSizes[currentTool]||4)*factor;
-                ctx.lineWidth=size;ctx.lineCap='round';ctx.lineJoin='round';
-                if(currentTool==='eraser'){
-                    ctx.globalCompositeOperation='destination-out';ctx.globalAlpha=1;
-                    if(eraserCursor){const ds=toolSizes.eraser*zoomScale;eraserCursor.style.width=ds+'px';eraserCursor.style.height=ds+'px';eraserCursor.style.left=e.clientX+'px';eraserCursor.style.top=e.clientY+'px';eraserCursor.style.display='block';}
-                }else{
-                    ctx.globalCompositeOperation='source-over';ctx.strokeStyle=activeColor;ctx.globalAlpha=currentTool==='highlighter'?0.28:1;
-                }
-                ctx.beginPath();ctx.arc(p.x,p.y,size/2,0,Math.PI*2);ctx.fillStyle=activeColor;ctx.fill();
+            let points = [], drawing = false;
+            const saveActual = () => {
+                const wrapper = document.querySelector(`.page-wrapper[data-actual-page="${actualPageNum}"]`);
+                const liveDisplay = wrapper ? Number(wrapper.dataset.pageNum) : getDisplayForActual(actualPageNum);
+                if (liveDisplay) savePageData(liveDisplay);
             };
-            canvas.onpointermove=e=>{
-                if(currentTool==='eraser'&&drawing&&eraserCursor){eraserCursor.style.left=e.clientX+'px';eraserCursor.style.top=e.clientY+'px';}
-                if(!drawing)return;const p=getPos(e),last=points[points.length-1];if(!last)return;if(Math.hypot(p.x-last.x,p.y-last.y)<1.2)return;
-                if(currentTool==='pen'||currentTool==='highlighter'){
-                    const mid={x:(last.x+p.x)/2,y:(last.y+p.y)/2};ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.quadraticCurveTo(last.x,last.y,mid.x,mid.y);ctx.stroke();
-                }else if(currentTool==='eraser'){ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();}
+            const finish = () => {
+                if (!drawing) return;
+                drawing=false; points=[]; ctx.globalAlpha=1; ctx.globalCompositeOperation='source-over';
+                if (eraserCursor) eraserCursor.style.display='none';
+                saveActual();
+            };
+            const drawSegment = p => {
+                const last = points[points.length-1];
+                if (!last) { points.push(p); return; }
+                const dx=p.x-last.x, dy=p.y-last.y, dist=Math.hypot(dx,dy);
+                if (dist < .15) return;
+                // Interpolate aggressively so even extremely fast pen motion never leaves holes.
+                const maxStep = Math.max(.7, Math.min(2.2, ctx.lineWidth * .18));
+                const steps = Math.max(1, Math.ceil(dist/maxStep));
+                let prev=last;
+                for(let i=1;i<=steps;i++){
+                    const t=i/steps;
+                    const q={x:last.x+dx*t,y:last.y+dy*t};
+                    ctx.beginPath();
+                    ctx.moveTo(prev.x,prev.y);
+                    ctx.lineTo(q.x,q.y);
+                    ctx.stroke();
+                    prev=q;
+                }
                 points.push(p);
+                if(points.length>12) points.splice(0,points.length-6);
             };
-            canvas.onpointerup=finish;canvas.onpointercancel=finish;
+            canvas.onpointerdown = e => {
+                if (!currentTool) return;
+                startTouch();
+                if (currentTool==='text') {
+                    const rect=canvas.parentElement.getBoundingClientRect(), fontSize=toolSizes.text||18;
+                    const bw=+(canvas.parentElement.dataset.baseWidth||600), bh=+(canvas.parentElement.dataset.baseHeight||800);
+                    createTextNode(((e.clientX-rect.left)/rect.width)*bw,((e.clientY-rect.top)/rect.height)*bh,'Type here...',activeColor,canvas.parentElement,Number(canvas.parentElement.dataset.pageNum),fontSize);
+                    saveActual(); return;
+                }
+                if(!['pen','eraser','highlighter'].includes(currentTool)) return;
+                redoStack=[];
+                historyStack.push({pageNum:Number(canvas.parentElement.dataset.pageNum),actualPage:actualPageNum,dataUrl:canvas.toDataURL('image/png')});
+                if(historyStack.length>12)historyStack.shift();
+                drawing=true; canvas.setPointerCapture?.(e.pointerId);
+                const factor = canvas.width / (+(canvas.parentElement.dataset.baseWidth||canvas.width));
+                const size=(toolSizes[currentTool]||4)*factor;
+                ctx.lineWidth=size;ctx.lineCap='round';ctx.lineJoin='round';ctx.miterLimit=2;
+                if(currentTool==='eraser'){
+                    ctx.globalCompositeOperation='destination-out';ctx.globalAlpha=1;ctx.strokeStyle='rgba(0,0,0,1)';
+                    if(eraserCursor){const ds=toolSizes.eraser*zoomScale;eraserCursor.style.width=ds+'px';eraserCursor.style.height=ds+'px';eraserCursor.style.left=e.clientX+'px';eraserCursor.style.top=e.clientY+'px';eraserCursor.style.display='block';}
+                } else {
+                    ctx.globalCompositeOperation='source-over';ctx.strokeStyle=activeColor;ctx.globalAlpha=currentTool==='highlighter'?.28:1;
+                }
+                const p=getPos(e); points=[p];
+                ctx.beginPath();ctx.arc(p.x,p.y,Math.max(.5,size/2),0,Math.PI*2);
+                ctx.fillStyle=currentTool==='eraser'?'rgba(0,0,0,1)':activeColor;ctx.fill();
+            };
+            canvas.onpointermove = e => {
+                if(currentTool==='eraser'&&drawing&&eraserCursor){eraserCursor.style.left=e.clientX+'px';eraserCursor.style.top=e.clientY+'px';}
+                if(!drawing)return;
+                const events = typeof e.getCoalescedEvents === 'function' ? e.getCoalescedEvents() : [e];
+                for(const ev of events) drawSegment(getPos(ev));
+            };
+            canvas.onpointerup=finish; canvas.onpointercancel=finish; canvas.onpointerleave=()=>{};
         }
 
         let redoStack = [];
@@ -2566,6 +3079,7 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
                 });
                 await saveDocumentSettings();
                 refreshThumbnail(displayIndex, actualPage);
+                schedulePortablePDFSave();
                 updateAutosaveIndicator('saved');
             } catch (err) {
                 console.error('Page save error:', err);
@@ -2854,6 +3368,112 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
             return PDFLib.rgb(0, 0, 0);
         }
 
+        async function buildPortablePdfBytes() {
+            if (!pdfDoc || !window.PDFLib || !currentFileId) return null;
+            const record = await getRecord(currentFileId);
+            if (!record || (!record.data && !record.chunked)) return null;
+            // Keep very large PDFs (>650 MB) in their chunked/editable form during
+            // normal autosave. Flattening such a file would require a second full
+            // in-memory copy and can freeze low-memory devices.
+            if (Number(record.size) > LARGE_PDF_FLATTEN_LIMIT) return null;
+            const sourceBytes = await assemblePdfBytes(record);
+            const pdfLibDoc = await PDFLib.PDFDocument.load(sourceBytes);
+            const newDoc = await PDFLib.PDFDocument.create();
+
+            for (let i = 0; i < pageOrder.length; i++) {
+                const actualPageNum = pageOrder[i];
+                const [copiedPage] = await newDoc.copyPages(pdfLibDoc, [actualPageNum - 1]);
+                const page = newDoc.addPage(copiedPage);
+                const { width, height } = page.getSize();
+
+                if (currentDrawings && currentDrawings[actualPageNum]) {
+                    try {
+                        const img = await newDoc.embedPng(currentDrawings[actualPageNum]);
+                        page.drawImage(img, { x: 0, y: 0, width, height });
+                    } catch (err) { console.error('Error embedding drawings:', err); }
+                }
+
+                if (currentImages && currentImages[actualPageNum]) {
+                    for (const imgData of currentImages[actualPageNum]) {
+                        try {
+                            let embeddedImg;
+                            if (String(imgData.src).startsWith('data:image/png')) embeddedImg = await newDoc.embedPng(imgData.src);
+                            else embeddedImg = await newDoc.embedJpg(imgData.src);
+                            const pdfY = height - imgData.y - imgData.h;
+                            page.drawImage(embeddedImg, { x: imgData.x, y: pdfY, width: imgData.w, height: imgData.h });
+                        } catch (err) { console.error('Error embedding image node:', err); }
+                    }
+                }
+
+                if (currentTexts && currentTexts[actualPageNum]) {
+                    currentTexts[actualPageNum].forEach(t => {
+                        if (!t.text) return;
+                        try {
+                            const pdfY = height - t.y - (t.fontSize || 18);
+                            page.drawText(t.text, {
+                                x: t.x,
+                                y: pdfY > 0 ? pdfY : t.y,
+                                size: t.fontSize || 18,
+                                color: parseColorToPdfRgb(t.color)
+                            });
+                        } catch (err) { console.error('Error drawing text node:', err); }
+                    });
+                }
+            }
+            return await newDoc.save({ useObjectStreams: true });
+        }
+
+        async function fingerprintBytes(bytes) {
+            const buf = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+            const hash=await crypto.subtle.digest('SHA-256',buf);
+            return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+        }
+
+        async function writeBytesToOriginalFile(bytes) {
+            if (!currentFileHandle || !bytes) return false;
+            try {
+                if (!(await ensureHandlePermission(currentFileHandle, false))) return false;
+                const writable=await currentFileHandle.createWritable({keepExistingData:false});
+                await writable.write(new Blob([bytes],{type:'application/pdf'}));
+                await writable.close();
+                const record=await getRecord(currentFileId);
+                if(record){record.fileHandle=currentFileHandle;record.latestWrittenFingerprint=await fingerprintBytes(bytes);record.lastOriginalWriteAt=Date.now();await putRecord(record);}
+                return true;
+            } catch(err) {
+                console.warn('Could not write directly to original PDF:',err);
+                return false;
+            }
+        }
+
+        async function savePortablePDF() {
+            if (!currentFileId || !db || !pdfDoc) return;
+            if (portableSavePromise) {
+                await portableSavePromise;
+                return;
+            }
+            portableSavePromise = (async () => {
+                try {
+                    updateAutosaveIndicator('saving');
+                    const bytes = await buildPortablePdfBytes();
+                    if (bytes) {
+                        await storePortablePdfInChunks(currentFileId, new Blob([bytes], { type: 'application/pdf' }));
+                        await writeBytesToOriginalFile(bytes);
+                    }
+                    updateAutosaveIndicator('saved');
+                } finally {
+                    portableSavePromise = null;
+                }
+            })();
+            await portableSavePromise;
+        }
+
+        function schedulePortablePDFSave() {
+            clearTimeout(portableSaveTimeout);
+            portableSaveTimeout = setTimeout(() => {
+                savePortablePDF().catch(err => console.error('Portable PDF autosave error:', err));
+            }, 1200);
+        }
+
         async function exportFullPDF() {
             if (!pdfDoc || !window.PDFLib || !currentFileId) return;
             try {
@@ -2861,55 +3481,19 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
                 await saveDocumentSettings();
                 updateAutosaveIndicator('saving');
 
-                const record = await getRecord(currentFileId);
-                if (!record || (!record.data && !record.chunked)) return;
-                const sourceBytes = await assemblePdfBytes(record);
-                const pdfLibDoc = await PDFLib.PDFDocument.load(sourceBytes);
-                const newDoc = await PDFLib.PDFDocument.create();
-
-                for (let i = 0; i < pageOrder.length; i++) {
-                    const actualPageNum = pageOrder[i];
-                    const [copiedPage] = await newDoc.copyPages(pdfLibDoc, [actualPageNum - 1]);
-                    const page = newDoc.addPage(copiedPage);
-                    const { width, height } = page.getSize();
-
-                    if (currentDrawings && currentDrawings[actualPageNum]) {
-                        try {
-                            const img = await newDoc.embedPng(currentDrawings[actualPageNum]);
-                            page.drawImage(img, { x: 0, y: 0, width, height });
-                        } catch (err) { console.error('Error embedding drawings:', err); }
+                const bytes = await buildPortablePdfBytes();
+                if (!bytes) {
+                    const record = await getRecord(currentFileId);
+                    if (Number(record?.size) > LARGE_PDF_FLATTEN_LIMIT) {
+                        alert('This PDF is larger than 650 MB. It remains fully editable and saved in chunks; flatten/export is intentionally skipped to prevent freezing low-memory devices.');
                     }
-
-                    if (currentImages && currentImages[actualPageNum]) {
-                        for (const imgData of currentImages[actualPageNum]) {
-                            try {
-                                let embeddedImg;
-                                if (String(imgData.src).startsWith('data:image/png')) embeddedImg = await newDoc.embedPng(imgData.src);
-                                else embeddedImg = await newDoc.embedJpg(imgData.src);
-                                const pdfY = height - imgData.y - imgData.h;
-                                page.drawImage(embeddedImg, { x: imgData.x, y: pdfY, width: imgData.w, height: imgData.h });
-                            } catch (err) { console.error('Error embedding image node:', err); }
-                        }
-                    }
-
-                    if (currentTexts && currentTexts[actualPageNum]) {
-                        currentTexts[actualPageNum].forEach(t => {
-                            if (!t.text) return;
-                            try {
-                                const pdfY = height - t.y - (t.fontSize || 18);
-                                page.drawText(t.text, {
-                                    x: t.x,
-                                    y: pdfY > 0 ? pdfY : t.y,
-                                    size: t.fontSize || 18,
-                                    color: parseColorToPdfRgb(t.color)
-                                });
-                            } catch (err) { console.error('Error drawing text node:', err); }
-                        });
-                    }
+                    updateAutosaveIndicator('saved');
+                    return;
                 }
+                await storePortablePdfInChunks(currentFileId, new Blob([bytes], { type: 'application/pdf' }));
+                await writeBytesToOriginalFile(bytes);
 
-                const pdfBytes = await newDoc.save({ useObjectStreams: true });
-                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                const blob = new Blob([bytes], { type: 'application/pdf' });
                 const link = document.createElement('a');
                 const url = URL.createObjectURL(blob);
                 link.href = url;
@@ -2925,7 +3509,6 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
                 alert('Export failed: ' + (err?.message || err));
             }
         }
-
 
         // ===== Lightweight Select / Lasso-like rectangle selection =====
         let selectedNodes = new Set();
@@ -2956,6 +3539,10 @@ function renderThumbnailSkeleton(displayIndex, actualPageNum) {
             window.addEventListener('pointermove',move,true);window.addEventListener('pointerup',up,true);
         },true);
         window.addEventListener('keydown',e=>{if(e.key==='Escape')clearSelection();if((e.key==='Delete'||e.key==='Backspace')&&selectedNodes.size){const grouped=[...selectedNodes];clearSelection();grouped.forEach(n=>n.remove());savePageData(currentPage);}});
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') document.getElementById('color-modal-overlay')?.classList.remove('show');
+        });
 
         // ===== PDF Outline in the existing sidebar =====
         const baseRenderSidebarBookmarks = renderSidebarBookmarks;
