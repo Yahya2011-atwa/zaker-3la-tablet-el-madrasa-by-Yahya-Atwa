@@ -20,6 +20,13 @@
             -webkit-tap-highlight-color: transparent; 
         }
         
+        html, body {
+            width: 100%;
+            min-width: 0;
+            min-height: 100%;
+            overscroll-behavior: none;
+        }
+
         body { 
             background: #eef2f5;
             color: #1c1c1e; 
@@ -29,6 +36,7 @@
             flex-direction: column; 
             overflow: hidden; 
             touch-action: manipulation;
+            -webkit-text-size-adjust: 100%;
         }
 
         .glass-bg {
@@ -717,7 +725,11 @@
             #zoom-controls { left:7px; right:auto; bottom:7px; }
             #toolbar-container { width:96vw; top:9px; }
             #bottom-thumbnails-bar { width:96vw; bottom:7px; }
-            #viewer-container { padding:120px 70px 105px; }
+            #viewer-container {
+                padding: max(120px, env(safe-area-inset-top) + 90px)
+                         70px
+                         max(105px, env(safe-area-inset-bottom) + 85px);
+            }
         }
 
         .selected-node { outline:2px solid #007aff !important; outline-offset:2px; }
@@ -1040,7 +1052,7 @@
         let currentPdfUrl = null;
         // Keep PDF data chunked in IndexedDB so opening large files does not require the whole file in RAM.
         // 4 MB is deliberately kept small for weak tablets while still avoiding excessive range requests.
-        const PDF_CHUNK_SIZE = 8 * 1024 * 1024;
+        const PDF_CHUNK_SIZE = 4 * 1024 * 1024;
         const THUMB_SCALE = 0.10;
 
         const request = indexedDB.open("AppleGlassPDFDB", 4);
@@ -1072,7 +1084,7 @@
             db = e.target.result;
             db.onversionchange = () => db.close();
             navigator.storage?.persist?.().catch(()=>{});
-            loadHomeFiles();
+            cleanupDuplicateFileRecords().finally(() => loadHomeFiles());
             initColorPicker();
         };
         request.onerror = e => console.error('IndexedDB error:', e.target?.error);
@@ -1311,6 +1323,10 @@
         let portableSavePromise = null;
         let currentFileHandle = null;
         let originalFileWriteErrorShown = false;
+
+        // Prevent an older async PDF open from winning a race when the user
+        // quickly selects/clicks another document.
+        let openOperationToken = 0;
 
         async function loadDocumentState(record) {
             currentDrawings = {};
@@ -1786,6 +1802,42 @@
             if(input) input.addEventListener('input',()=>{const h=normalizeHex(input.value);if(h)syncColorEditorFromHex(h);});
         });
 
+        async function cleanupDuplicateFileRecords() {
+            if (!db) return;
+            try {
+                const all = await idbRequest(
+                    db.transaction('files', 'readonly').objectStore('files').getAll()
+                );
+                const groups = new Map();
+
+                for (const record of all) {
+                    if (!record?.fingerprint) continue;
+                    const key = record.fingerprint;
+                    if (!groups.has(key)) groups.set(key, []);
+                    groups.get(key).push(record);
+                }
+
+                for (const records of groups.values()) {
+                    if (records.length <= 1) continue;
+
+                    // Keep the newest non-deleted record. Older duplicate cards
+                    // are soft-deleted so their saved annotations remain recoverable.
+                    records.sort((a, b) => Number(b.lastReaddedAt || b.createdAt || 0) -
+                                          Number(a.lastReaddedAt || a.createdAt || 0));
+                    const keep = records.find(r => !r.deleted) || records[0];
+
+                    for (const duplicate of records) {
+                        if (duplicate.id === keep.id || duplicate.deleted) continue;
+                        duplicate.deleted = true;
+                        duplicate.deletedAt = Date.now();
+                        await putRecord(duplicate);
+                    }
+                }
+            } catch (err) {
+                console.warn('Duplicate cleanup skipped:', err);
+            }
+        }
+
         async function loadHomeFiles() {
             const grid = document.getElementById('notesGrid');
             if (!grid || !db) return;
@@ -1857,10 +1909,30 @@
             loadHomeFiles();
         }
 
+        // IMPORTANT: never read the whole PDF just to identify it.
+        // Reading a 700+ MB file with file.arrayBuffer() can exhaust tablet RAM
+        // before the PDF is even stored. We use a deterministic lightweight
+        // content signature made from metadata + the beginning/end of the file.
         async function pdfFingerprint(file) {
-            const bytes = await file.arrayBuffer();
-            const hash = await crypto.subtle.digest('SHA-256', bytes);
-            return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+            const SAMPLE = 2 * 1024 * 1024;
+            const headEnd = Math.min(SAMPLE, file.size);
+            const tailStart = Math.max(0, file.size - SAMPLE);
+            const [head, tail] = await Promise.all([
+                file.slice(0, headEnd).arrayBuffer(),
+                file.slice(tailStart, file.size).arrayBuffer()
+            ]);
+
+            const meta = new TextEncoder().encode(
+                `PDFv3|${file.size}|${file.lastModified || 0}|${file.type || ''}|`
+            );
+            const combined = new Uint8Array(meta.byteLength + head.byteLength + tail.byteLength);
+            combined.set(meta, 0);
+            combined.set(new Uint8Array(head), meta.byteLength);
+            combined.set(new Uint8Array(tail), meta.byteLength + head.byteLength);
+
+            const hash = await crypto.subtle.digest('SHA-256', combined);
+            return Array.from(new Uint8Array(hash))
+                .map(b => b.toString(16).padStart(2, '0')).join('');
         }
 
         async function ensureHandlePermission(handle, request=false) {
@@ -1874,7 +1946,14 @@
         }
 
         async function openPdfSmart() {
-            if (window.showOpenFilePicker) {
+            // Android/iPad installed apps and WebViews can expose a partial or
+            // unreliable File System Access API. The native <input type=file>
+            // picker is more compatible there and still supports large files.
+            const isTouchDevice =
+                navigator.maxTouchPoints > 0 ||
+                /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+            if (!isTouchDevice && window.showOpenFilePicker) {
                 try {
                     const [handle] = await window.showOpenFilePicker({
                         multiple:false,
@@ -1890,7 +1969,11 @@
                     console.warn('Direct file picker unavailable, falling back:', err);
                 }
             }
-            document.getElementById('pdfUploader')?.click();
+
+            const input = document.getElementById('pdfUploader');
+            if (!input) return;
+            input.value = '';
+            input.click();
         }
 
         async function importPdfFile(file, fileHandle=null) {
@@ -1899,13 +1982,29 @@
                 alert('Please select a PDF file.'); return;
             }
             const fingerprint = await pdfFingerprint(file);
-            const existingFiles = await idbRequest(db.transaction('files','readonly').objectStore('files').getAll());
-            const existing = existingFiles.find(f => f.fingerprint===fingerprint || f.latestWrittenFingerprint===fingerprint);
+            const existingFiles = await idbRequest(
+                db.transaction('files','readonly').objectStore('files').getAll()
+            );
+
+            // Only the ORIGINAL SOURCE signature can identify an imported file.
+            // Do not compare it with latestWrittenFingerprint: that fingerprint
+            // belongs to an exported/flattened copy and can make an unrelated
+            // selected file attach to the wrong document state.
+            const existing = existingFiles.find(
+                f => !f.deleted && f.fingerprint === fingerprint
+            ) || existingFiles.find(
+                f => f.fingerprint === fingerprint
+            );
+
             if (existing) {
-                existing.deleted=false; existing.deletedAt=null; existing.lastReaddedAt=Date.now();
-                if(fileHandle) existing.fileHandle=fileHandle;
+                existing.deleted = false;
+                existing.deletedAt = null;
+                existing.lastReaddedAt = Date.now();
+                if (fileHandle) existing.fileHandle = fileHandle;
                 await putRecord(existing);
-                await openPDF(existing.id); loadHomeFiles(); return;
+                await openPDF(existing.id);
+                await loadHomeFiles();
+                return;
             }
             const id='pdf_'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
             const record={id,name:file.name,size:file.size,fingerprint,latestWrittenFingerprint:fingerprint,deleted:false,chunked:true,chunkSize:PDF_CHUNK_SIZE,createdAt:Date.now()};
@@ -1929,25 +2028,60 @@
         });
 
         async function openPDF(id) {
+            const token = ++openOperationToken;
+
             try {
-                currentFileId = id;
+                // Stop a previous document from remaining active while another
+                // one is being opened.
+                if (pdfDoc) {
+                    try { await pdfDoc.destroy(); } catch (_) {}
+                    pdfDoc = null;
+                }
+                if (currentPdfUrl) {
+                    URL.revokeObjectURL(currentPdfUrl);
+                    currentPdfUrl = null;
+                }
+
                 const record = await getRecord(id);
-                if (!record) return;
+                if (!record || record.deleted) return;
+                if (token !== openOperationToken) return;
+
+                // Set identity only after the record was successfully found.
+                currentFileId = id;
                 currentFileHandle = record.fileHandle || null;
                 originalFileWriteErrorShown = false;
 
                 await loadDocumentState(record);
+                if (token !== openOperationToken) return;
+
                 await openPdfForRecord(record);
+                if (token !== openOperationToken) {
+                    try { await pdfDoc?.destroy(); } catch (_) {}
+                    pdfDoc = null;
+                    return;
+                }
 
                 if (!pageOrder.length) {
                     pageOrder = Array.from({ length: pdfDoc.numPages }, (_, i) => i + 1);
                 }
 
-                currentPage = Math.min(Math.max(Number(savedPageViewState.currentPage) || 1, 1), pageOrder.length);
-                const pageState = savedPageViewState[currentPage] || savedPageViewState[String(currentPage)] || {};
-                zoomScale = Math.max(0.5, Math.min(6.0, Number(pageState.zoomScale ?? savedPageViewState.zoomScale ?? 1)));
+                currentPage = Math.min(
+                    Math.max(Number(savedPageViewState.currentPage) || 1, 1),
+                    pageOrder.length
+                );
+
+                const pageState =
+                    savedPageViewState[currentPage] ||
+                    savedPageViewState[String(currentPage)] || {};
+
+                zoomScale = Math.max(
+                    0.5,
+                    Math.min(6.0, Number(pageState.zoomScale ?? savedPageViewState.zoomScale ?? 1))
+                );
                 viewMode = savedPageViewState.viewMode || viewMode || 'horizontal';
                 globalPageStyle = savedPageViewState.globalPageStyle || globalPageStyle || 'blank';
+
+                if (token !== openOperationToken) return;
 
                 document.getElementById('home-screen').style.display = 'none';
                 document.getElementById('editor-screen').style.display = 'flex';
@@ -1962,11 +2096,15 @@
                     pageViewState: savedPageViewState
                 });
 
+                if (token !== openOperationToken) return;
+
                 initVirtualViewer();
                 fullscreenWanted = true;
                 fullscreenExplicitlyExited = false;
                 requestAppFullscreen(true);
             } catch (err) {
+                // Ignore cancellation caused by a newer open operation.
+                if (token !== openOperationToken) return;
                 console.error('Error loading PDF:', err);
                 alert('Error loading PDF file: ' + (err?.message || err));
             }
