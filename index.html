@@ -1042,9 +1042,18 @@
 
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('./sw.js').catch(err => console.log('SW registration failed:', err));
+                navigator.serviceWorker.register('./sw.js', { scope: './' }).then(reg => reg.update()).catch(err => console.log('SW registration failed:', err));
             });
         }
+
+        // PWA storage: ask the browser to keep the local PDF database from being evicted.
+        // This is especially important when the app is installed from Add to Home Screen.
+        async function requestPersistentStorage() {
+            try {
+                if (navigator.storage?.persist) await navigator.storage.persist();
+            } catch (_) {}
+        }
+        window.addEventListener('load', requestPersistentStorage, { once: true });
 
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -1914,7 +1923,7 @@
         // before the PDF is even stored. We use a deterministic lightweight
         // content signature made from metadata + the beginning/end of the file.
         async function pdfFingerprint(file) {
-            const SAMPLE = 2 * 1024 * 1024;
+            const SAMPLE = 1 * 1024 * 1024;
             const headEnd = Math.min(SAMPLE, file.size);
             const tailStart = Math.max(0, file.size - SAMPLE);
             const [head, tail] = await Promise.all([
