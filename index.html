@@ -3341,12 +3341,12 @@ function scheduleReclaimOrphans() {
 function strokeToSvgPath(stroke, bw, bh, pdfW, pdfH) {
   const pts = stroke.points;
   if (!pts || pts.length < 2 || !bw || !bh || !pdfW || !pdfH) return null;
-  /* Stored stroke coordinates are in the rendered page's base-scale space.
-     Export happens in the PDF's native point space, so scale both axes explicitly. */
+  /* Stored points use a top-left origin (PDF.js/editor coordinates).
+     PDF-lib drawing uses a bottom-left origin, so Y must be inverted. */
   const sx = pdfW / bw;
   const sy = pdfH / bh;
   const x = v => (v * sx).toFixed(2);
-  const y = v => (v * sy).toFixed(2);
+  const y = v => (pdfH - v * sy).toFixed(2);
   let d = 'M ' + x(pts[0].x) + ' ' + y(pts[0].y);
   for (let i = 1; i < pts.length; i++) {
     const p0 = pts[i-1], p1 = pts[i];
@@ -3447,9 +3447,10 @@ async function exportPDF() {
               const rgb = hex2rgb(s.color);
               const opts = {
                 x: 0,
-                y: sz.height, /* SVG y-down origin at page top */
+                y: 0,
                 borderColor: PDFLib.rgb(rgb.r/255, rgb.g/255, rgb.b/255),
-                borderWidth: s.size,
+                /* Stored width is in editor base-scale units; convert to PDF points. */
+                borderWidth: s.size * ((exportBW && sz.width) ? (sz.width / exportBW) : 1),
                 borderOpacity: s.tool === 'hl' ? 0.4 : 1,
                 borderLineCap: PDFLib.LineCapStyle.Round,
                 borderLineJoin: PDFLib.LineJoinStyle.Round,
@@ -3471,7 +3472,22 @@ async function exportPDF() {
         const ch = Math.max(1, Math.round(sz.height * scale));
         const cv = document.createElement('canvas');
         cv.width = cw; cv.height = ch;
-        renderStrokesToCanvas(cv, list, cw, ch);
+        /* The stored points are in editor base-scale coordinates, not in the
+         * temporary raster canvas dimensions. Passing cw/ch here double-scales
+         * the annotation positions during export. */
+        let overlayBW = sz.width * baseScale;
+        let overlayBH = sz.height * baseScale;
+        try {
+          const srcPageNum = pageOrder[i];
+          if (srcPageNum !== null && srcPageNum !== undefined) {
+            const srcPg = await pdfDoc.getPage(srcPageNum);
+            const srcVp = srcPg.getViewport({ scale: baseScale, rotation: srcPg.rotate || 0 });
+            overlayBW = srcVp.width;
+            overlayBH = srcVp.height;
+            srcPg.cleanup?.();
+          }
+        } catch(_) {}
+        renderStrokesToCanvas(cv, list, overlayBW, overlayBH);
         const dataUrl = cv.toDataURL('image/png');
         const png = await lib.embedPng(dataUrl);
         page.drawImage(png, { x:0, y:0, width:sz.width, height:sz.height });
