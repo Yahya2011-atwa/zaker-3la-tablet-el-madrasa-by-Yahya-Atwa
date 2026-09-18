@@ -27,9 +27,10 @@ svg{display:block}
   --sh-md:0 1px 2px #0a0b0f0a,0 4px 12px #0a0b0f0f;
   --sh-lg:0 2px 4px #0a0b0f0a,0 12px 32px #0a0b0f17;
   --sh-page:0 2px 8px #0a0b0f14,0 16px 48px #0a0b0f1f;
-  --scrim:#b6b8bf;--scrim-soft:#cdd0d6;
-  --status-bg:#ffffff;--status-fg:#0a0b0f;
-  --toast-bg:#0a0b0f;--toast-fg:#ffffff;
+  --scrim:rgba(20,24,34,.24);--scrim-soft:rgba(20,24,34,.18);
+  --blur-overlay:blur(20px) saturate(180%);
+  --status-bg:rgba(255,255,255,.72);--status-fg:#0a0b0f;
+  --toast-bg:rgba(10,11,15,.74);--toast-fg:#ffffff;
 }
 html,body{height:100%;overflow:hidden;overscroll-behavior:none;
   font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Inter,system-ui,sans-serif;
@@ -45,9 +46,9 @@ body.dark{
   --sh-md:0 1px 2px #0000004d,0 4px 12px #00000059;
   --sh-lg:0 2px 4px #00000059,0 12px 32px #00000080;
   --sh-page:0 2px 8px #00000059,0 16px 48px #0000008c;
-  --scrim:#2a2d36;--scrim-soft:#1d1f26;
-  --status-bg:#101218;--status-fg:#f4f5f8;
-  --toast-bg:#e6e8ee;--toast-fg:#0a0b0f;
+  --scrim:rgba(0,0,0,.46);--scrim-soft:rgba(0,0,0,.38);
+  --status-bg:rgba(16,18,24,.72);--status-fg:#f4f5f8;
+  --toast-bg:rgba(230,232,238,.92);--toast-fg:#0a0b0f;
 }
 /* ══════════ HOME ══════════ */
 #home{position:fixed;inset:0;display:flex;flex-direction:column;overflow:hidden;background:var(--bg)}
@@ -261,6 +262,7 @@ body.dark .slider-h::-moz-range-thumb{background:#3a3e4a;border:2px solid #555a6
   touch-action:pan-x pan-y pinch-zoom;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
   scroll-behavior:smooth;}
 .stage.gesturing{scroll-behavior:auto !important;}
+.stage,.track{will-change:scroll-position;}
 .stage::-webkit-scrollbar{width:0;height:0}
 .stage.v{gap:48px;flex-direction:column;align-items:center}
 .stage.h{gap:0;flex-direction:row;justify-content:flex-start}
@@ -318,7 +320,7 @@ body.focus-mode .rail{transform:translateX(-50%) translateY(140%);opacity:0;poin
 .th .mk{position:absolute;top:0;right:4px;width:13px;height:17px;
   background:#FF453A;clip-path:polygon(0 0,100% 0,100% 100%,50% 70%,0 100%);
   display:none;z-index:3;box-shadow:0 2px 5px #ff453a8c;}
-.th.bookmarked .mk{display:block}
+.th.bookmarked .mk{display:block;}
 .th.bookmarked{box-shadow:inset 0 0 0 1.5px #ff3b3080;}
 .th.bookmarked.on{box-shadow:0 0 0 3px #0a7aff29,inset 0 0 0 1.5px #ff3b30a6;}
 .zoom{position:absolute;bottom:calc(var(--sb) + 12px);right:calc(var(--sr) + 14px);left:auto;transform:none;z-index:100;
@@ -351,6 +353,7 @@ body.focus-mode .zoom{transform:translateY(140%);opacity:0;pointer-events:none}
   background:var(--status-bg);color:var(--status-fg);
   font-size:11.5px;font-weight:650;font-variant-numeric:tabular-nums;letter-spacing:-.005em;
   border:1px solid var(--line);
+  -webkit-backdrop-filter:var(--blur-overlay);backdrop-filter:var(--blur-overlay);
   box-shadow:0 4px 16px #0a0b0f24;contain:layout paint;
   transition:background .3s,color .3s,border-color .3s;}
 #editor.on ~ .status-bar{display:flex}
@@ -366,19 +369,22 @@ body.focus-mode .zoom{transform:translateY(140%);opacity:0;pointer-events:none}
 .sb-page b{color:var(--status-fg);font-weight:750;font-size:11.5px;}
 .sb-page span{opacity:.75;font-weight:600;}
 .page-chip-floating{position:fixed;bottom:calc(var(--sb) + 84px);left:50%;transform:translateX(-50%);z-index:140;
-  background:var(--status-bg);border:1px solid var(--line);border-radius:999px;padding:5px 10px;box-shadow:var(--sh-md);display:none}
+  background:var(--status-bg);border:1px solid var(--line);border-radius:999px;padding:5px 10px;box-shadow:var(--sh-md);
+  -webkit-backdrop-filter:var(--blur-overlay);backdrop-filter:var(--blur-overlay);display:none}
 #editor.on ~ .page-chip-floating{display:flex}
 .err-banner{position:fixed;top:calc(var(--st) + 8px);left:50%;transform:translateX(-50%) translateY(-120%);
   z-index:9500;display:flex;align-items:center;gap:10px;padding:10px 14px;border-radius:12px;
-  background:#FF3B30;color:#fff;font-size:13px;font-weight:600;
+  background:rgba(255,59,48,.9);color:#fff;font-size:13px;font-weight:600;
+  -webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
   box-shadow:0 8px 24px #ff3b3059;max-width:90vw;
   transition:transform .3s cubic-bezier(.34,1.4,.64,1);pointer-events:none;}
 .err-banner.on{transform:translateX(-50%) translateY(0);pointer-events:auto}
 .err-banner svg{width:18px;height:18px;flex-shrink:0}
 .err-banner button{padding:4px 10px;border-radius:7px;background:#ffffff33;color:#fff;font-size:12px;font-weight:700;}
-/* ══════════ OVERLAYS — fully opaque ══════════ */
+/* ══════════ OVERLAYS — blurred backdrop ══════════ */
 .ovl{position:fixed;inset:0;z-index:1000;display:none;align-items:center;justify-content:center;padding:20px;
-  background:var(--scrim);opacity:0;transition:opacity .22s;}
+  background:var(--scrim);opacity:0;transition:opacity .22s;
+  -webkit-backdrop-filter:blur(26px) saturate(150%);backdrop-filter:blur(26px) saturate(150%);}
 .ovl.on{display:flex;opacity:1}
 .modal{width:min(430px,94vw);max-height:88dvh;overflow:auto;padding:22px;border-radius:20px;
   transform:scale(.95);opacity:0;transition:transform .28s cubic-bezier(.34,1.4,.64,1),opacity .22s;
@@ -425,7 +431,8 @@ body.dark .dlg-icon.save,body.dark .dlg-icon.check{background:#1a2e22}
   font-family:inherit;font-size:11px;font-weight:700;color:var(--text);}
 .numkey-ovl{position:fixed;inset:0;z-index:1010;display:none;align-items:flex-end;justify-content:center;
   padding:20px;padding-bottom:calc(var(--sb) + 20px);
-  background:var(--scrim);opacity:0;transition:opacity .2s;}
+  background:var(--scrim);opacity:0;transition:opacity .2s;
+  -webkit-backdrop-filter:blur(26px) saturate(150%);backdrop-filter:blur(26px) saturate(150%);}
 .numkey-ovl.on{display:flex;opacity:1}
 .numkey{width:min(340px,94vw);padding:16px;border-radius:22px;
   background:var(--surface);border:1px solid var(--line);contain:layout paint;
@@ -528,6 +535,7 @@ body.picking #pickPreview{display:block;opacity:1;will-change:left,top;}
   z-index:9600;display:none;align-items:center;gap:10px;padding:8px 8px 8px 14px;border-radius:100px;
   background:var(--surface);border:1px solid var(--line);
   box-shadow:0 4px 12px #0a0b0f14,0 12px 40px #0a0b0f33;
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
   opacity:0;transition:opacity .22s,transform .28s cubic-bezier(.34,1.4,.64,1);}
 body.picking .pick-bar{display:flex;opacity:1;transform:translateX(-50%) translateY(0)}
 .pick-bar-color{width:36px;height:36px;border-radius:50%;
@@ -542,6 +550,7 @@ body.picking .pick-bar{display:flex;opacity:1;transform:translateX(-50%) transla
 .pick-btn.confirm{background:var(--blue);color:#fff;box-shadow:0 1px 2px #0a7aff4d;}
 .pick-btn.confirm:hover{background:var(--blue-d)}
 .dbg{position:fixed;inset:0;z-index:900;background:var(--scrim-soft);
+  -webkit-backdrop-filter:blur(22px) saturate(145%);backdrop-filter:blur(22px) saturate(145%);
   opacity:0;pointer-events:none;transition:opacity .22s;}
 .dbg.on{opacity:1;pointer-events:auto}
 .dr{position:fixed;top:0;left:0;bottom:0;width:min(340px,86vw);z-index:901;transform:translateX(-100%);
@@ -568,6 +577,8 @@ body.picking .pick-bar{display:flex;opacity:1;transform:translateX(-50%) transla
 .toast{position:fixed;bottom:calc(var(--sb) + 106px);left:50%;transform:translateX(-50%) translateY(140%);z-index:1200;
   display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:14px;
   font-size:13px;font-weight:600;letter-spacing:-.008em;color:var(--toast-fg);background:var(--toast-bg);
+  -webkit-backdrop-filter:blur(24px) saturate(170%);backdrop-filter:blur(24px) saturate(170%);
+  border:1px solid #ffffff1f;isolation:isolate;
   box-shadow:0 12px 32px #0a0b0f52,0 0 0 1px #ffffff0d;
   opacity:0;pointer-events:none;transition:transform .3s cubic-bezier(.34,1.4,.64,1),opacity .24s;max-width:90vw;}
 .toast.on{transform:translateX(-50%) translateY(0);opacity:1;pointer-events:auto}
@@ -1042,6 +1053,8 @@ let penRecentlyActive=false, penActiveTimer=null;
 let wakeLock=null, rtlEnabled=false, multiTouchActive=false;
 let pickingMode=false, pickCurrentHex='#000000';
 let defaultPageSize=null;
+const loadedStrokePids=new Set();
+const strokeLoadPromises=new Map();
 const dirtyPages=new Set();
 let savePagesTimer=null;
 let thumbObserver=null;
@@ -1296,6 +1309,38 @@ async function checkStorageQuota() {
 function makeStroke(tool, color, size, points) {
   return { id: uid(), tool, color, size, points };
 }
+async function ensurePageStrokes(pid) {
+  if (!pid || !fid || !db) return [];
+  if (loadedStrokePids.has(pid)) return strokes.get(pid) || [];
+  if (strokeLoadPromises.has(pid)) return strokeLoadPromises.get(pid);
+  const promise = (async () => {
+    try {
+      const rec = await idbGet('pages', [fid, pid]);
+      const arr = Array.isArray(rec?.strokes) ? rec.strokes : [];
+      strokes.set(pid, arr);
+      loadedStrokePids.add(pid);
+      return arr;
+    } catch (e) {
+      console.error('load page annotations failed', pid, e);
+      strokes.set(pid, []);
+      loadedStrokePids.add(pid);
+      return [];
+    } finally {
+      strokeLoadPromises.delete(pid);
+    }
+  })();
+  strokeLoadPromises.set(pid, promise);
+  return promise;
+}
+async function hydrateAllStrokes() {
+  if (!fid || !db) return;
+  const pageRecs = await idbBy('pages','fid',fid);
+  for (const p of pageRecs) {
+    if (p.strokes) strokes.set(p.pageId, p.strokes);
+    else strokes.set(p.pageId, []);
+    loadedStrokePids.add(p.pageId);
+  }
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
    STROKE RENDERING
@@ -1496,27 +1541,35 @@ async function redo() {
 function markPageDirty(pid) {
   dirtyPages.add(pid);
   if (savePagesTimer) clearTimeout(savePagesTimer);
-  savePagesTimer = setTimeout(() => { flushPageSaves().catch(() => {}); }, 800);
+  savePagesTimer = setTimeout(() => { flushPageSaves().catch(() => {}); }, 450);
 }
 async function flushPageSaves() {
   if (savePagesTimer) { clearTimeout(savePagesTimer); savePagesTimer = null; }
   const list = Array.from(dirtyPages);
-  dirtyPages.clear();
+  if (!list.length) return;
+  const saved = [];
   for (const pid of list) {
-    const arr = strokes.get(pid) || [];
+    const arr = (strokes.get(pid) || []).map(s => ({
+      ...s,
+      points: (s.points || []).map(pt => ({ x: pt.x, y: pt.y, w: pt.w }))
+    }));
     try {
-      if (arr.length === 0) await idbDel('pages', [fid, pid]).catch(() => {});
+      if (arr.length === 0) await idbDel('pages', [fid, pid]);
       else await idbPut('pages', { fid, pageId: pid, strokes: arr });
-    } catch(e) { console.error('save page failed', pid, e); }
+      saved.push(pid);
+    } catch(e) {
+      console.error('save page failed', pid, e);
+    }
   }
-  if (list.length && !hasUnexportedEdits) { hasUnexportedEdits = true; updateDirtyBadge(); }
-  for (const pid of list) {
+  for (const pid of saved) {
+    dirtyPages.delete(pid);
     const idx = pageIdList.indexOf(pid);
     if (idx >= 0) {
       const pgEl = document.querySelector('.pg[data-d="' + (idx+1) + '"]');
       if (pgEl) refreshThumb(idx+1, +pgEl.dataset.a);
     }
   }
+  if (saved.length && !hasUnexportedEdits) { hasUnexportedEdits = true; updateDirtyBadge(); }
 }
 function redrawPageStrokes(pid) {
   const idx = pageIdList.indexOf(pid);
@@ -1667,10 +1720,8 @@ async function openFile(id) {
     pageStyles = st.pageStyles || {};
     viewState = st.viewState || {};
 
-    const pageRecs = await idbBy('pages','fid',id);
-    for (const p of pageRecs) {
-      if (p.strokes) strokes.set(p.pageId, p.strokes);
-    }
+    loadedStrokePids.clear();
+    strokeLoadPromises.clear();
     if (st.bookmarks) for (const [k,v] of Object.entries(st.bookmarks)) bookmarks.set(k, v);
 
     const buf = await rec.data.arrayBuffer();
@@ -1694,13 +1745,18 @@ async function openFile(id) {
     const pv = viewState[curPage] || {};
     zoom = clamp(Number(pv.zoomScale ?? viewState.zoomScale ?? 1), MIN_ZOOM, MAX_ZOOM);
 
-    captureThumb();
     $('#home').style.display = 'none';
     $('#editor').classList.add('on');
-    await saveSettings();
     buildCanvas();
     updateViewIcon();
     updateChip();
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        captureThumb().catch(() => {});
+        saveSettings().catch(() => {});
+        ensurePageStrokes(pageIdList[curPage-1]).catch(() => {});
+      }, 0);
+    });
     setTimeout(() => requestFullscreenSafe(), 100);
   } catch(err) {
     if (tok !== openToken) return;
@@ -1838,7 +1894,7 @@ async function renderPage(el, actualPage, display) {
       vp = { width: sz.width * baseScale, height: sz.height * baseScale };
     } else {
       pdfPg = await pdfDoc.getPage(actualPage);
-      if (!el.isConnected) { rendersInFlight--; return; }
+      if (!el.isConnected) { return; }
       vp = pdfPg.getViewport({ scale: baseScale, rotation: rot + (pdfPg.rotate || 0) });
     }
     const bw = vp.width, bh = vp.height;
@@ -1895,25 +1951,43 @@ async function renderPage(el, actualPage, display) {
       pctx.fillRect(0, 0, pdfC.width, pdfC.height);
     } else {
       await pdfPg.render({ canvasContext: pdfC.getContext('2d'), viewport: hd }).promise;
-      if (!el.isConnected) { rendersInFlight--; return; }
+      if (!el.isConnected) { return; }
     }
 
     const pid = el.dataset.pid;
+    await ensurePageStrokes(pid);
+    if (!el.isConnected) { pdfPg?.cleanup?.(); rendersInFlight--; return; }
     renderStrokesToCanvas(inkC, strokes.get(pid) || [], bw, bh);
 
-    if (!isBlank && Math.abs(display - curPage) <= 1) {
-      const tc = await pdfPg.getTextContent();
-      if (el.isConnected) {
-        const doText = () => {
-          try { pdfjsLib.renderTextLayer({ textContent:tc, container:tl, viewport:vp, textDivs:[] }); } catch(_) {}
-        };
-        if (window.requestIdleCallback) requestIdleCallback(doText, { timeout:1200 });
-        else setTimeout(doText, 60);
-      }
-    }
-    pdfPg?.cleanup?.();
+    /* Wire drawing BEFORE text extraction. Large/complex PDFs can take a long time
+       to produce a textContent stream; that must never block the pen/eraser. */
     wireInk(el, inkC, strokeC, lassoC, hitbox, actualPage, display, pid);
     updateCanvasInteractivity();
+
+    const loadTextLayer = async () => {
+      if (!pdfPg || !el.isConnected || el.dataset.rendered !== '1') {
+        pdfPg?.cleanup?.();
+        return;
+      }
+      try {
+        const tc = await pdfPg.getTextContent();
+        if (!el.isConnected || el.dataset.rendered !== '1') return;
+        try {
+          pdfjsLib.renderTextLayer({ textContent:tc, container:tl, viewport:vp, textDivs:[] });
+        } catch(_) {}
+      } catch(_) {
+        /* Text layer is an enhancement; never block annotation input. */
+      } finally {
+        pdfPg?.cleanup?.();
+      }
+    };
+
+    if (!isBlank && Math.abs(display - curPage) <= 1) {
+      if (window.requestIdleCallback) requestIdleCallback(loadTextLayer, { timeout:900 });
+      else setTimeout(loadTextLayer, 0);
+    } else {
+      pdfPg?.cleanup?.();
+    }
   } catch(err) {
     console.error('renderPage error:', err);
     el.dataset.rendered = '0';
@@ -1936,11 +2010,14 @@ function wireInk(pgEl, inkC, strokeC, lassoC, hitbox, actualPage, display, pid) 
   if (hitbox.dataset.wired === '1') return;
   hitbox.dataset.wired = '1';
 
-  const ictx = inkC.getContext('2d', { alpha:true, desynchronized:true });
+  /* Keep live ink composited on the normal canvas path. Using a
+     desynchronized 2D context here can expose transient scanout/tearing
+     artifacts while pointer events are arriving quickly. */
+  const ictx = inkC.getContext('2d', { alpha:true });
   const sctx = strokeC.getContext('2d', { alpha:true });
   const lctx = lassoC.getContext('2d', { alpha:true });
-  ictx.lineCap='round'; ictx.lineJoin='round';
-  sctx.lineCap='round'; sctx.lineJoin='round';
+  ictx.lineCap='round'; ictx.lineJoin='round'; ictx.imageSmoothingEnabled=true;
+  sctx.lineCap='round'; sctx.lineJoin='round'; sctx.imageSmoothingEnabled=true;
 
   let stroke = null;
   let lasso = null;
@@ -2054,7 +2131,7 @@ function wireInk(pgEl, inkC, strokeC, lassoC, hitbox, actualPage, display, pid) 
     stroke = {
       tool: tool === 'hl' ? 'hl' : (tool === 'er' ? 'er' : 'pen'),
       color: currentColor(), size,
-      points: [], pending: [], last: pt, lastMid: pt, speed: 0,
+      points: [], pending: [], last: pt, lastMid: pt, speed: 0, skipNext: false,
       pressureMode: (tool === 'pen' && penHasPressure())
     };
     const sf = sizeFactor();
@@ -2086,67 +2163,86 @@ function wireInk(pgEl, inkC, strokeC, lassoC, hitbox, actualPage, display, pid) 
     if (!stroke) return;
     bounceFocus();
     if (stroke.tool === 'er') showEraserCursor(ev.clientX, ev.clientY, erSize * zoom);
-    let events = [ev];
-    if (typeof ev.getCoalescedEvents === 'function') {
-      const list = ev.getCoalescedEvents();
-      if (list && list.length) events = list;
+    // Use only the current pointer sample. Coalesced hardware events can arrive
+    // out of order on some pen/mouse/browser combinations and create false bridges.
+    const pt = getPt(ev);
+    if (!pt) return;
+    const bx = +pgEl.dataset.bw || inkC.width;
+    const by = +pgEl.dataset.bh || inkC.height;
+    const inside = pt.bx >= 0 && pt.by >= 0 && pt.bx <= bx && pt.by <= by;
+    if (!inside) {
+      stroke.skipNext = true;
+      return;
     }
-    for (let i = 0; i < events.length; i++) {
-      const pt = getPt(events[i]);
-      if (pt) queuePt(pt);
+    if (stroke.skipNext) {
+      stroke.skipNext = false;
+      stroke.last = pt;
+      stroke.lastMid = pt;
+      stroke.speed = 0;
+      return;
     }
+    queuePt(pt);
   };
 
   const drawLiveSegment = pt => {
     if (!stroke) return;
-    const { last, lastMid, size } = stroke;
-    const dx = pt.bx - last.bx, dy = pt.by - last.by;
-    const dist = Math.sqrt(dx*dx + dy*dy);
+    const { last, size } = stroke;
+    if (!last || !pt) return;
+
+    const dx = pt.bx - last.bx;
+    const dy = pt.by - last.by;
+    const dist = Math.hypot(dx, dy);
+    if (!Number.isFinite(dist) || !Number.isFinite(pt.bx) || !Number.isFinite(pt.by)) return;
     if (dist < 0.4) return;
+
+    // Hard guard against pointer glitches: never connect a discontinuous sample.
+    const pageW = +pgEl.dataset.bw || inkC.width;
+    const pageH = +pgEl.dataset.bh || inkC.height;
+    const maxJump = Math.max(90, Math.min(220, Math.min(pageW, pageH) * 0.16));
+    if (dist > maxJump) {
+      stroke.last = pt;
+      stroke.lastMid = pt;
+      stroke.speed = 0;
+      return;
+    }
+
     const isHl = stroke.tool === 'hl';
     const isEr = stroke.tool === 'er';
     const ctx = isHl ? sctx : ictx;
-    if (isEr) { ctx.globalCompositeOperation='destination-out'; ctx.strokeStyle='#000'; }
-    else { ctx.globalCompositeOperation='source-over'; ctx.globalAlpha = isHl?0.4:1; ctx.strokeStyle=stroke.color; }
+    const sf = sizeFactor();
+
+    if (isEr) {
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = '#000';
+    } else {
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = isHl ? 0.4 : 1;
+      ctx.strokeStyle = stroke.color;
+    }
+
     let wBase = size;
     if (stroke.pressureMode) {
-      stroke.speed = stroke.speed*0.72 + dist*0.28;
-      const speedNorm = Math.min(1, stroke.speed/8);
+      stroke.speed = stroke.speed * 0.72 + dist * 0.28;
+      const speedNorm = Math.min(1, stroke.speed / 8);
       const pressure = pt.pressure || 0.5;
-      wBase = size * (1.12 - speedNorm*0.4) * (0.82 + pressure*0.36);
-      wBase = clamp(wBase, size*0.5, size*1.2);
+      wBase = size * (1.12 - speedNorm * 0.4) * (0.82 + pressure * 0.36);
+      wBase = clamp(wBase, size * 0.5, size * 1.2);
     }
-    const sf = sizeFactor();
+
     const wCanvas = wBase * sf;
     const storeW = stroke.pressureMode ? wBase : size;
-    const MAX_STEP = Math.max(4, wCanvas*0.55);
-    if (dist * sf > MAX_STEP) {
-      const steps = Math.min(32, Math.ceil((dist*sf)/MAX_STEP));
-      let fx = last.bx, fy = last.by, fmx = lastMid.bx, fmy = lastMid.by;
-      for (let i = 1; i <= steps; i++) {
-        const t = i/steps;
-        const px = last.bx + dx*t, py = last.by + dy*t;
-        const mx = ((fx + px)/2)*sf, my = ((fy + py)/2)*sf;
-        ctx.lineWidth = wCanvas;
-        ctx.beginPath();
-        ctx.moveTo(fmx, fmy);
-        ctx.quadraticCurveTo(fx*sf, fy*sf, mx, my);
-        ctx.stroke();
-        fmx = mx; fmy = my; fx = px; fy = py;
-        stroke.points.push({ x:px, y:py, w:storeW });
-      }
-      stroke.lastMid = { bx:fx, by:fy };
-    } else {
-      const mx = (last.bx + pt.bx)/2, my = (last.by + pt.by)/2;
-      ctx.lineWidth = wCanvas;
-      ctx.beginPath();
-      ctx.moveTo(lastMid.bx*sf, lastMid.by*sf);
-      ctx.quadraticCurveTo(last.bx*sf, last.by*sf, mx*sf, my*sf);
-      ctx.stroke();
-      stroke.points.push({ x:pt.bx, y:pt.by, w:storeW });
-      stroke.lastMid = { bx:mx, by:my };
-    }
+    ctx.lineWidth = Math.max(0.5, wCanvas);
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(last.bx * sf, last.by * sf);
+    ctx.lineTo(pt.bx * sf, pt.by * sf);
+    ctx.stroke();
+
+    stroke.points.push({ x: pt.bx, y: pt.by, w: storeW });
     stroke.last = pt;
+    stroke.lastMid = pt;
   };
 
   const onUp = ev => {
@@ -2504,6 +2600,7 @@ function createThumb(d, a, pid) {
 }
 async function renderThumbCanvas(el, a, cv) {
   const pid = el.dataset.pid;
+  await ensurePageStrokes(pid);
   const list = strokes.get(pid) || [];
   if (a === null) {
     const sz = defaultPageSize || { width:595, height:842 };
@@ -2633,7 +2730,7 @@ let settingsSaving = false;
 let settingsPending = false;
 function scheduleSaveSettings() {
   clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => saveSettings().catch(() => {}), 900);
+  saveTimer = setTimeout(() => saveSettings().catch(() => {}), 650);
 }
 async function saveSettings() {
   if (!fid || !db) return;
@@ -3241,22 +3338,25 @@ function scheduleReclaimOrphans() {
    Vector export: only pen + highlighter strokes with uniform width.
    Any eraser stroke or variable-width pen forces raster fallback for that page.
 */
-function strokeToSvgPath(stroke, bw, bh) {
+function strokeToSvgPath(stroke, bw, bh, pdfW, pdfH) {
   const pts = stroke.points;
-  if (!pts || pts.length < 2) return null;
-  /* PDF page coord system: y-up. Our stroke coords are y-down (top-left).
-     pdf-lib's drawSvgPath expects y-down (SVG), so no flip needed — we place
-     at (0, pageHeight) so the y-down origin maps to page top-left. */
-  let d = 'M ' + pts[0].x.toFixed(2) + ' ' + pts[0].y.toFixed(2);
+  if (!pts || pts.length < 2 || !bw || !bh || !pdfW || !pdfH) return null;
+  /* Stored stroke coordinates are in the rendered page's base-scale space.
+     Export happens in the PDF's native point space, so scale both axes explicitly. */
+  const sx = pdfW / bw;
+  const sy = pdfH / bh;
+  const x = v => (v * sx).toFixed(2);
+  const y = v => (v * sy).toFixed(2);
+  let d = 'M ' + x(pts[0].x) + ' ' + y(pts[0].y);
   for (let i = 1; i < pts.length; i++) {
     const p0 = pts[i-1], p1 = pts[i];
-    const mx = ((p0.x + p1.x)/2).toFixed(2);
-    const my = ((p0.y + p1.y)/2).toFixed(2);
+    const mx = x((p0.x + p1.x)/2);
+    const my = y((p0.y + p1.y)/2);
     if (i === 1) d += ' L ' + mx + ' ' + my;
-    else d += ' Q ' + p0.x.toFixed(2) + ' ' + p0.y.toFixed(2) + ' ' + mx + ' ' + my;
+    else d += ' Q ' + x(p0.x) + ' ' + y(p0.y) + ' ' + mx + ' ' + my;
   }
   const last = pts[pts.length-1];
-  d += ' L ' + last.x.toFixed(2) + ' ' + last.y.toFixed(2);
+  d += ' L ' + x(last.x) + ' ' + y(last.y);
   return d;
 }
 function isVectorizable(strokeList) {
@@ -3280,6 +3380,8 @@ async function exportPDF() {
   toast('Preparing PDF…', null, 'busy');
   try {
     await flushPageSaves();
+    /* Load persisted annotations for pages that have never been visited in this session. */
+    await hydrateAllStrokes();
     const rec = await idbGet('files', fid);
     const bytes = new Uint8Array(await rec.data.arrayBuffer());
 
@@ -3324,10 +3426,23 @@ async function exportPDF() {
       try {
         const sz = page.getSize();
         /* Try vector export first (much smaller) */
-        if (isVectorizable(list) && typeof page.drawSvgPath === 'function') {
+        const displayRot = Number(pageStyles[(i+1) + '_rot'] || 0);
+        if (displayRot === 0 && isVectorizable(list) && typeof page.drawSvgPath === 'function') {
           try {
+            /* Reconstruct the same base-scale dimensions used by the editor. */
+            let exportBW = sz.width * baseScale;
+            let exportBH = sz.height * baseScale;
+            try {
+              const srcPageNum = pageOrder[i];
+              if (srcPageNum !== null && srcPageNum !== undefined) {
+                const srcPg = await pdfDoc.getPage(srcPageNum);
+                const srcVp = srcPg.getViewport({ scale:baseScale, rotation:srcPg.rotate || 0 });
+                exportBW = srcVp.width; exportBH = srcVp.height;
+                srcPg.cleanup?.();
+              }
+            } catch(_) {}
             for (const s of list) {
-              const d = strokeToSvgPath(s, sz.width, sz.height);
+              const d = strokeToSvgPath(s, exportBW, exportBH, sz.width, sz.height);
               if (!d) continue;
               const rgb = hex2rgb(s.color);
               const opts = {
