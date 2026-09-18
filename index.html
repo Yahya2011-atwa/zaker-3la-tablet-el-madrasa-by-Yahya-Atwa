@@ -1355,7 +1355,7 @@ const MAX_CONCURRENT_RENDERS = Math.max(2, Math.min(4, (navigator.hardwareConcur
 const PALM_REJECT_MS = 5000;
 const TWO_FINGER_TAP_MS = 320;
 const TWO_FINGER_TAP_DIST = 22;
-const FOCUS_HIDE_MS = 3500;
+const FOCUS_HIDE_MS = 999999999;
 
 /* ── WebP support detection (once) ── */
 const SUPPORTS_WEBP = (() => {
@@ -1493,7 +1493,7 @@ function enterFocusMode() {
   if (focusMode) { clearTimeout(focusTimer); focusTimer = setTimeout(exitFocusMode, FOCUS_HIDE_MS); return; }
   if (pickingMode) return;
   focusMode = true;
-  document.body.classList.add('focus-mode');
+  // disabled focus mode
   focusTimer = setTimeout(exitFocusMode, FOCUS_HIDE_MS);
 }
 function exitFocusMode() {
