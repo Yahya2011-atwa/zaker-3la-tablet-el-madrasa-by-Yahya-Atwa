@@ -3385,11 +3385,25 @@ async function exportPDF() {
     const rec = await idbGet('files', fid);
     const bytes = new Uint8Array(await rec.data.arrayBuffer());
 
+    /* A custom page rotation changes the coordinate system seen by the user.
+     * For such documents, export the displayed page as a single flattened
+     * image. This is deliberately used only when a page was rotated, keeping
+     * normal exports fast and searchable. */
+    let exactRasterExport = false;
+    for (let i = 0; i < pageOrder.length; i++) {
+      const r = ((Number(pageStyles[(i+1) + '_rot'] || 0) % 360) + 360) % 360;
+      if (r) { exactRasterExport = true; break; }
+    }
+
     const isIdentity = pageOrder.length === pdfDoc.numPages &&
                        pageOrder.every((n, i) => n === i + 1);
 
     let lib, pages;
-    if (isIdentity) {
+    if (exactRasterExport) {
+      lib = await PDFLib.PDFDocument.create();
+      pages = [];
+      for (let i = 0; i < pageOrder.length; i++) pages.push(null);
+    } else if (isIdentity) {
       lib = await PDFLib.PDFDocument.load(bytes);
       pages = lib.getPages();
     } else {
@@ -3421,9 +3435,46 @@ async function exportPDF() {
       const pid = pageIdList[i];
       const list = strokes.get(pid) || [];
       if (!list.length) continue;
-      const page = pages[i];
-      if (!page) { failed.push({ page:i+1, reason:'Page not in output' }); continue; }
+      let page = pages[i];
       try {
+        if (exactRasterExport) {
+          const srcNum = pageOrder[i];
+          if (srcNum === null || srcNum === undefined) {
+            page = lib.addPage([defaultPageSize?.width || 595, defaultPageSize?.height || 842]);
+            pages[i] = page;
+            continue;
+          }
+          const srcPg = await pdfDoc.getPage(srcNum);
+          const displayRot = ((Number(pageStyles[(i+1) + '_rot'] || 0) % 360) + 360) % 360;
+          const srcRot = ((Number(srcPg.rotate || 0) % 360) + 360) % 360;
+          const totalRot = (srcRot + displayRot) % 360;
+          const maxPagePx = EXPORT_MAX_PX;
+          const baseVp = srcPg.getViewport({ scale: baseScale, rotation: totalRot });
+          const finalScale = Math.max(0.65, Math.min(EXPORT_RASTER_DPR, maxPagePx / Math.max(baseVp.width, baseVp.height)));
+          const vp = srcPg.getViewport({ scale: baseScale * finalScale, rotation: totalRot });
+          const cv = document.createElement('canvas');
+          cv.width = Math.max(1, Math.ceil(vp.width));
+          cv.height = Math.max(1, Math.ceil(vp.height));
+          const ctx = cv.getContext('2d', { alpha:false });
+          ctx.fillStyle = '#fff'; ctx.fillRect(0,0,cv.width,cv.height);
+          await srcPg.render({ canvasContext:ctx, viewport:vp, intent:'print' }).promise;
+
+          const ink = document.createElement('canvas');
+          ink.width = cv.width; ink.height = cv.height;
+          renderStrokesToCanvas(ink, strokes.get(pid) || [], baseVp.width, baseVp.height);
+          ctx.drawImage(ink, 0, 0);
+
+          const jpg = await lib.embedJpg(cv.toDataURL('image/jpeg', 0.94));
+          page = lib.addPage([vp.width / (baseScale * finalScale), vp.height / (baseScale * finalScale)]);
+          page.drawImage(jpg, { x:0, y:0, width:vp.width/(baseScale*finalScale), height:vp.height/(baseScale*finalScale) });
+          pages[i] = page;
+          embeddedCount++;
+          srcPg.cleanup?.();
+          continue;
+        }
+
+        page = pages[i];
+        if (!page) { failed.push({ page:i+1, reason:'Page not in output' }); continue; }
         const sz = page.getSize();
         /* Try vector export first (much smaller) */
         const displayRot = Number(pageStyles[(i+1) + '_rot'] || 0);
