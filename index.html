@@ -3,14 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5,user-scalable=yes,viewport-fit=cover">
-<meta name="theme-color" content="#0A7AFF">
+<meta name="theme-color" content="#f2f3f7">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Zaker">
-<link rel="manifest" href="./manifest.json">
-<link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
-<link rel="apple-touch-icon" href="./icon-192.png">
 <title>Zaker Pro — PDF Study Workspace</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js" crossorigin="anonymous"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js" crossorigin="anonymous"></script>
@@ -213,7 +207,6 @@ body.dark .slider-h::-moz-range-thumb{background:#3a3e4a;border:2px solid #555a6
 .pop-colors button:hover{transform:scale(1.1)}
 .pop-colors button:active{transform:scale(.88)}
 .pop-colors button.on{box-shadow:0 0 0 1.5px var(--surface),0 0 0 3px var(--blue)}
-/* Shape mode — much more compact */
 .pop.shape-mode{min-width:196px;border-radius:18px}
 .pop.shape-mode .pop-head{padding:10px 12px 8px;gap:8px}
 .pop.shape-mode .pop-head .ph-icon{width:24px;height:24px;border-radius:8px}
@@ -410,7 +403,6 @@ body.picking .pick-bar{display:flex;opacity:1;transform:translateX(-50%) transla
 .pick-btn.cancel:hover{background:var(--active)}
 .pick-btn.confirm{background:var(--blue);color:#fff;box-shadow:0 1px 2px #0a7aff4d}
 .pick-btn.confirm:hover{background:var(--blue-d)}
-/* Edit element bar */
 .edit-bar{position:fixed;bottom:calc(var(--sb) + 90px);left:50%;transform:translateX(-50%) translateY(24px);z-index:9600;display:none;align-items:center;gap:8px;padding:8px 10px;border-radius:100px;background:var(--surface);border:1px solid var(--line);box-shadow:0 4px 12px #0a0b0f14,0 12px 40px #0a0b0f33;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);opacity:0;transition:opacity .22s,transform .28s cubic-bezier(.34,1.4,.64,1);max-width:min(680px,calc(100vw - 24px));overflow-x:auto;scrollbar-width:none}
 .edit-bar::-webkit-scrollbar{display:none}
 .edit-bar.on{display:flex;opacity:1;transform:translateX(-50%) translateY(0)}
@@ -856,8 +848,13 @@ const BACKUP_MAGIC = 'ZK19';
 const BACKUP_VERSION = 22;
 const EXPORT_MAX_PX = 2200;
 const EXPORT_RASTER_DPR = 1.6;
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 const POINT_FORMAT_VERSION = 2;
+
+/* Performance & durability tuning */
+const SAVE_DEBOUNCE_MS = 150;   // quiet time before save
+const SAVE_MAX_WAIT_MS = 1100;  // max delay before forced save (safety net)
+const THUMB_IDLE_MS = 900;
 
 /* ═══════════════════════════════════════════════════════════════════════════
    STATE
@@ -1001,6 +998,16 @@ function deserializeStroke(s) {
   return { id: s.id, tool: s.tool, color: s.color, size: s.size, points: Array.isArray(s.points) ? s.points : [] };
 }
 function cloneStroke(s) { return JSON.parse(JSON.stringify(s)); }
+
+/* ── Serialization cache (WeakMap) ──
+   Strokes are immutable once committed: any modification creates a brand new object.
+   So caching serialized output per-object is safe and turns O(n) save into O(new items). */
+const serializedByStroke = new WeakMap();
+function serializeStrokeCached(s) {
+  let ser = serializedByStroke.get(s);
+  if (!ser) { ser = serializeStroke(s); serializedByStroke.set(s, ser); }
+  return ser;
+}
 
 function setSave(mode, txt) {
   const chip=$('#saveChip'), t=$('#saveTxt');
@@ -1200,6 +1207,8 @@ function showNumericPrompt(opts={}) {
 
 /* ═══════════════════════════════════════════════════════════════════════════
    INDEXEDDB
+   DB v3 adds a 'strokes' store: one record per stroke, keyed by [fid, pageId, strokeId].
+   This makes writes O(1) instead of rewriting the whole page each save.
    ═══════════════════════════════════════════════════════════════════════════ */
 function openDB() {
   return new Promise((res, rej) => {
@@ -1210,6 +1219,10 @@ function openDB() {
       if (!d.objectStoreNames.contains('pages')) {
         const s = d.createObjectStore('pages', { keyPath:['fid','pageId'] });
         s.createIndex('fid','fid');
+      }
+      if (!d.objectStoreNames.contains('strokes')) {
+        const s = d.createObjectStore('strokes', { keyPath:['fid','pageId','strokeId'] });
+        s.createIndex('fid_pid', ['fid','pageId']);
       }
       if (!d.objectStoreNames.contains('settings')) d.createObjectStore('settings', { keyPath:'fid' });
       if (!d.objectStoreNames.contains('texts')) {
@@ -1226,6 +1239,28 @@ const idbPut = (s,v) => new Promise((res,rej) => { const r=db.transaction(s,'rea
 const idbDel = (s,k) => new Promise((res,rej) => { const r=db.transaction(s,'readwrite').objectStore(s).delete(k); r.onsuccess=e=>res(e.target.result); r.onerror=e=>rej(e.target.error); });
 const idbAll = s => new Promise((res,rej) => { const r=db.transaction(s,'readonly').objectStore(s).getAll(); r.onsuccess=e=>res(e.target.result); r.onerror=e=>rej(e.target.error); });
 const idbBy = (s,idx,k) => new Promise((res,rej) => { const r=db.transaction(s,'readonly').objectStore(s).index(idx).getAll(k); r.onsuccess=e=>res(e.target.result); r.onerror=e=>rej(e.target.error); });
+
+/* Batched transaction helpers: many ops in a single tx = fast */
+function idbBatchPutStrokes(records) {
+  return new Promise((res, rej) => {
+    if (!records.length) return res();
+    const tx = db.transaction('strokes','readwrite');
+    const s = tx.objectStore('strokes');
+    for (const r of records) s.put(r);
+    tx.oncomplete = () => res();
+    tx.onerror = e => rej(e.target.error);
+  });
+}
+function idbBatchDelStrokes(keys) {
+  return new Promise((res, rej) => {
+    if (!keys.length) return res();
+    const tx = db.transaction('strokes','readwrite');
+    const s = tx.objectStore('strokes');
+    for (const k of keys) s.delete(k);
+    tx.oncomplete = () => res();
+    tx.onerror = e => rej(e.target.error);
+  });
+}
 
 async function fingerprint(file) {
   const S = 1024*1024;
@@ -1263,17 +1298,53 @@ function addKnownTag(tag) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   STROKE MODEL
+   STROKE MODEL — chunked persistence (one stroke per record)
    ═══════════════════════════════════════════════════════════════════════════ */
 function makeStroke(tool, color, size, points) { return { id: uid(), tool, color, size, points }; }
+
+/* Pending writes to be batched (per page) */
+const pendingStrokePuts = new Map(); // pid -> array of stroke records
+const pendingStrokeDels = new Map(); // pid -> array of strokeIds
+
+function queueStrokePut(pid, stroke) {
+  if (!fid) return;
+  const arr = pendingStrokePuts.get(pid) || [];
+  arr.push({ fid, pageId: pid, strokeId: stroke.id, data: serializeStrokeCached(stroke) });
+  pendingStrokePuts.set(pid, arr);
+}
+function queueStrokeDel(pid, strokeId) {
+  if (!fid) return;
+  const arr = pendingStrokeDels.get(pid) || [];
+  arr.push([fid, pid, strokeId]);
+  pendingStrokeDels.set(pid, arr);
+}
+async function flushStrokeQueue() {
+  const puts = [];
+  for (const arr of pendingStrokePuts.values()) puts.push(...arr);
+  pendingStrokePuts.clear();
+  const dels = [];
+  for (const arr of pendingStrokeDels.values()) dels.push(...arr);
+  pendingStrokeDels.clear();
+  try {
+    if (dels.length) await idbBatchDelStrokes(dels);
+    if (puts.length) await idbBatchPutStrokes(puts);
+  } catch(e) { console.error('flushStrokeQueue', e); }
+}
+
+/* Load strokes for a page from the chunked store, with legacy fallback */
 async function ensurePageStrokes(pid) {
   if (!pid || !fid || !db) return [];
   if (loadedStrokePids.has(pid)) return strokes.get(pid) || [];
   if (strokeLoadPromises.has(pid)) return strokeLoadPromises.get(pid);
   const promise = (async () => {
     try {
-      const rec = await idbGet('pages', [fid, pid]);
-      const loaded = Array.isArray(rec?.strokes) ? rec.strokes.map(deserializeStroke).filter(Boolean) : [];
+      const recs = await idbBy('strokes','fid_pid', [fid, pid]);
+      let loaded = recs.map(r => deserializeStroke(r.data)).filter(Boolean);
+      // Legacy fallback (v2 blob) if chunked store empty
+      if (!loaded.length) {
+        const legacy = await idbGet('pages', [fid, pid]);
+        if (Array.isArray(legacy?.strokes)) loaded = legacy.strokes.map(deserializeStroke).filter(Boolean);
+      }
       const existing = strokes.get(pid);
       if (Array.isArray(existing) && existing.length) {
         const loadedIds = new Set();
@@ -1297,11 +1368,25 @@ async function ensurePageStrokes(pid) {
 }
 async function hydrateAllStrokes() {
   if (!fid || !db) return;
-  const pageRecs = await idbBy('pages','fid',fid);
+  const recs = await idbBy('strokes','fid_pid').catch(() => []);
+  // Note: getAll on index without key range returns everything
+  const byPage = new Map();
+  for (const r of recs) {
+    if (r.fid !== fid) continue;
+    const arr = byPage.get(r.pageId) || [];
+    arr.push(deserializeStroke(r.data));
+    byPage.set(r.pageId, arr);
+  }
+  // Legacy fallback for pages missing from chunked store
+  const pageRecs = await idbBy('pages','fid',fid).catch(() => []);
   for (const p of pageRecs) {
+    if (byPage.has(p.pageId)) continue;
     const arr = p.strokes ? p.strokes.map(deserializeStroke).filter(Boolean) : [];
-    strokes.set(p.pageId, arr);
-    loadedStrokePids.add(p.pageId);
+    byPage.set(p.pageId, arr);
+  }
+  for (const [pid, arr] of byPage) {
+    strokes.set(pid, arr);
+    loadedStrokePids.add(pid);
   }
 }
 async function getPageText(pageNum) {
@@ -1501,13 +1586,19 @@ function applyInkDelta(pageId, added, removed, forward) {
     const removedIds = new Set(removed.map(r => r.id));
     const kept = removedIds.size ? list.filter(s => !removedIds.has(s.id)) : list;
     strokes.set(pageId, kept.concat(added));
+    // Persist changes: delete removed, put added
+    for (const r of removed) queueStrokeDel(pageId, r.id);
+    for (const s of added) queueStrokePut(pageId, s);
   } else {
     const addedIds = new Set(added.map(s => s.id));
     const kept = addedIds.size ? list.filter(s => !addedIds.has(s.id)) : list.slice();
     const sorted = removed.slice().sort((a,b) => a.index - b.index);
     for (const r of sorted) { const idx = Math.min(r.index, kept.length); kept.splice(idx, 0, r.stroke); }
     strokes.set(pageId, kept);
+    for (const s of added) queueStrokeDel(pageId, s.id);
+    for (const r of removed) queueStrokePut(pageId, r.stroke);
   }
+  markPageDirty(pageId);
 }
 function applyPageOp(cmd, forward) {
   const target = forward ? cmd.after : cmd.before;
@@ -1535,13 +1626,13 @@ function applyRotate(cmd, forward) {
 function applyCommand(cmd, forward) {
   if (cmd.kind === 'ink') {
     applyInkDelta(cmd.pageId, cmd.added, cmd.removed, forward);
-    markPageDirty(cmd.pageId);
     redrawPageStrokes(cmd.pageId);
     const idx = pageIdList.indexOf(cmd.pageId);
     if (idx >= 0) {
       const pgEl = document.querySelector('.pg[data-d="' + (idx+1) + '"]');
       if (pgEl) refreshThumb(idx+1, +pgEl.dataset.a);
     }
+    flushStrokeQueue();
   } else if (cmd.kind === 'bookmark') {
     const val = forward ? cmd.after : cmd.before;
     if (val) bookmarks.set(cmd.pageId, val); else bookmarks.delete(cmd.pageId);
@@ -1578,7 +1669,7 @@ function undo() {
   haptic(6);
   hasUnexportedEdits = true;
   updateDirtyBadge();
-  flushPageSaves().catch(console.error);
+  flushStrokeQueue().catch(console.error);
 }
 function redo() {
   if (busy || !redoStack.length) return;
@@ -1593,34 +1684,61 @@ function redo() {
   haptic(6);
   hasUnexportedEdits = true;
   updateDirtyBadge();
-  flushPageSaves().catch(console.error);
+  flushStrokeQueue().catch(console.error);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    PAGE PERSISTENCE
+   ──────────────────────────────────────────────────────────────────────────
+   Two layers of safety:
+   1) A "quiet-time" debounce (150ms) batches rapid changes.
+   2) A "max-wait" timer (1.1s) forces a save even under continuous activity.
+   This guarantees at most ~1.1s of work is ever at risk.
    ═══════════════════════════════════════════════════════════════════════════ */
-const pageSaveTimers = new Map();
-const pageSaveChains = new Map();
+const pageSaveTimers = new Map();   // pid -> quiet-time timeout
+const pageSaveMaxTimers = new Map(); // pid -> max-wait timeout
+const pageSaveChains = new Map();   // pid -> serialization of running saves
+
 function markPageDirty(pid) {
   if (!pid) return;
   dirtyPages.add(pid);
+
   const prev = pageSaveTimers.get(pid);
   if (prev) clearTimeout(prev);
-  pageSaveTimers.set(pid, setTimeout(() => {
+
+  // Start the max-wait countdown once per burst
+  if (!pageSaveMaxTimers.has(pid)) {
+    const maxT = setTimeout(() => {
+      pageSaveMaxTimers.delete(pid);
+      const quietT = pageSaveTimers.get(pid);
+      if (quietT) { clearTimeout(quietT); pageSaveTimers.delete(pid); }
+      saveOnePage(pid).catch(e => console.error('forced save', pid, e));
+    }, SAVE_MAX_WAIT_MS);
+    pageSaveMaxTimers.set(pid, maxT);
+  }
+
+  // Quiet-time debounce
+  const t = setTimeout(() => {
     pageSaveTimers.delete(pid);
-    saveOnePage(pid).catch(err => console.error('save page error', pid, err));
-  }, 120));
+    const maxT = pageSaveMaxTimers.get(pid);
+    if (maxT) { clearTimeout(maxT); pageSaveMaxTimers.delete(pid); }
+    saveOnePage(pid).catch(e => console.error('debounced save', pid, e));
+  }, SAVE_DEBOUNCE_MS);
+  pageSaveTimers.set(pid, t);
 }
-function snapshotStrokesForSave(pid) { return (strokes.get(pid) || []).map(serializeStroke); }
 async function saveOnePage(pid) {
   if (!pid || !fid || !db) return false;
   const previous = pageSaveChains.get(pid) || Promise.resolve();
   const chain = previous.catch(() => {}).then(async () => {
     if (!fid || !db) return false;
-    const arr = snapshotStrokesForSave(pid);
     try {
-      if (arr.length === 0) await idbDel('pages', [fid, pid]);
-      else await idbPut('pages', { fid, pageId: pid, strokes: arr });
+      // 1) Flush the pending stroke queue (chunked writes)
+      await flushStrokeQueue();
+      // 2) Legacy blob cleanup: ensure no stale v2 record for this page
+      try {
+        const legacy = await idbGet('pages', [fid, pid]);
+        if (legacy) await idbDel('pages', [fid, pid]);
+      } catch(_) {}
       dirtyPages.delete(pid);
       queueThumbRefresh(pid);
       return true;
@@ -1638,13 +1756,16 @@ async function saveOnePage(pid) {
 async function flushPageSaves() {
   for (const t of pageSaveTimers.values()) clearTimeout(t);
   pageSaveTimers.clear();
+  for (const t of pageSaveMaxTimers.values()) clearTimeout(t);
+  pageSaveMaxTimers.clear();
+  // Always flush the queue (in case there are pending writes for pages not marked dirty)
+  await flushStrokeQueue();
   const pids = Array.from(dirtyPages);
   await Promise.all(pids.map(pid => saveOnePage(pid)));
   const chains = Array.from(pageSaveChains.values());
   if (chains.length) await Promise.allSettled(chains);
   const stillDirty = Array.from(dirtyPages);
   if (stillDirty.length) await Promise.all(stillDirty.map(pid => saveOnePage(pid)));
-  if (!hasUnexportedEdits) { hasUnexportedEdits = true; updateDirtyBadge(); }
 }
 function redrawPageStrokes(pid) {
   const idx = pageIdList.indexOf(pid);
@@ -1672,6 +1793,7 @@ function appendStrokeToCanvas(pid, stroke) {
   ctx.globalCompositeOperation = 'source-over';
   ctx.globalAlpha = 1;
 }
+/* Thumbnails: pause during active drawing, then run when idle */
 const thumbRefreshQueue = new Set();
 let thumbRefreshTimer = null;
 function queueThumbRefresh(pid) {
@@ -1679,6 +1801,11 @@ function queueThumbRefresh(pid) {
   if (thumbRefreshTimer) return;
   thumbRefreshTimer = setTimeout(() => {
     thumbRefreshTimer = null;
+    // Defer while user is actively drawing
+    if (activeStrokeCancel) {
+      thumbRefreshTimer = setTimeout(() => { thumbRefreshTimer = null; queueThumbRefresh(pid); }, THUMB_IDLE_MS);
+      return;
+    }
     const batch = Array.from(thumbRefreshQueue);
     thumbRefreshQueue.clear();
     const run = () => {
@@ -1689,9 +1816,9 @@ function queueThumbRefresh(pid) {
         if (pgEl) refreshThumb(idx+1, +pgEl.dataset.a);
       }
     };
-    if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 1000 });
+    if (window.requestIdleCallback) requestIdleCallback(run, { timeout: 1500 });
     else setTimeout(run, 0);
-  }, 700);
+  }, THUMB_IDLE_MS);
 }
 function refreshBookmarkUI(pid) {
   const idx = pageIdList.indexOf(pid);
@@ -1809,8 +1936,16 @@ async function duplicateFile(id) {
   const { id: _, ...rest } = f;
   const dup = { ...rest, id: newId, name: f.name.replace(/(\.[^.]+)?$/, ' (copy)$1'), lastOpened: now(), deleted: false };
   await idbPut('files', dup);
-  const pages = await idbBy('pages','fid',id);
-  for (const p of pages) await idbPut('pages', { fid:newId, pageId:p.pageId, strokes:p.strokes });
+  // Copy strokes
+  const pageRecs = await idbBy('pages','fid',id).catch(() => []);
+  for (const p of pageRecs) await idbPut('pages', { fid:newId, pageId:p.pageId, strokes:p.strokes });
+  const strokeRecs = await idbBy('strokes','fid_pid').catch(() => []);
+  const puts = [];
+  for (const r of strokeRecs) {
+    if (r.fid !== id) continue;
+    puts.push({ fid:newId, pageId:r.pageId, strokeId:r.strokeId, data:r.data });
+  }
+  if (puts.length) await idbBatchPutStrokes(puts);
   const st = await idbGet('settings', id);
   if (st) await idbPut('settings', { ...st, fid:newId });
   await loadHome();
@@ -1822,6 +1957,10 @@ async function deleteFile(id) {
   const ok = await dlgConfirm(`Delete "${f.name}"? This permanently removes the PDF and all its edits.`, { title:'Delete board', confirmText:'Delete', kind:'danger', danger:true });
   if (!ok) return;
   try {
+    // Delete strokes
+    const strokeRecs = await idbBy('strokes','fid_pid').catch(() => []);
+    const delKeys = strokeRecs.filter(r => r.fid === id).map(r => [r.fid, r.pageId, r.strokeId]);
+    if (delKeys.length) await idbBatchDelStrokes(delKeys);
     const pages = await idbBy('pages','fid',id);
     if (pages.length) {
       await new Promise((res, rej) => {
@@ -1897,8 +2036,13 @@ async function openFile(id) {
     strokes = new Map();
     bookmarks = new Map();
     dirtyPages.clear();
+    for (const t of pageSaveTimers.values()) clearTimeout(t);
     pageSaveTimers.clear();
+    for (const t of pageSaveMaxTimers.values()) clearTimeout(t);
+    pageSaveMaxTimers.clear();
     pageSaveChains.clear();
+    pendingStrokePuts.clear();
+    pendingStrokeDels.clear();
     textCache.clear();
     settingsCache.clear();
     hasUnexportedEdits = false;
@@ -2287,7 +2431,6 @@ function renderEditBarValues() {
       };
       sw.appendChild(b);
     }
-    /* "+" swatch → open full picker */
     const more = document.createElement('button');
     more.className = 'eb-sw';
     more.style.background = 'conic-gradient(from 0deg,#FF3B30,#FFD60A,#30A46C,#0A7AFF,#A855F7,#FF3B30)';
@@ -2318,6 +2461,8 @@ function applyEditLive() {
   drawEditHighlight();
   queueThumbRefresh(pid);
   markPageDirty(pid);
+  // Persist live: queue stroke put
+  queueStrokePut(pid, working);
   hasUnexportedEdits = true;
   updateDirtyBadge();
 }
@@ -2412,8 +2557,11 @@ function commitEditSelection(save=true) {
         const removed = [{ id: strokeId, index: idx, stroke: original }];
         const added = [working];
         pushUndo({ kind:'ink', pageId:pid, added, removed });
+        // Already queued live; ensure queue has final version
+        queueStrokePut(pid, working);
         markPageDirty(pid);
         queueThumbRefresh(pid);
+        flushStrokeQueue();
       }
     } else {
       const list = strokes.get(pid) || [];
@@ -2422,7 +2570,9 @@ function commitEditSelection(save=true) {
         list[idx] = original;
         redrawPageStrokes(pid);
         queueThumbRefresh(pid);
+        queueStrokePut(pid, original);
         markPageDirty(pid);
+        flushStrokeQueue();
       }
     }
   }
@@ -2440,11 +2590,11 @@ function deleteEditSelection() {
     const removed = [{ id: strokeId, index: idx, stroke: original }];
     applyInkDelta(pid, [], removed, true);
     pushUndo({ kind:'ink', pageId:pid, added:[], removed });
-    markPageDirty(pid);
     redrawPageStrokes(pid);
     queueThumbRefresh(pid);
     hasUnexportedEdits = true;
     updateDirtyBadge();
+    flushStrokeQueue();
   }
   clearEditHighlight(pid);
   editSelection = null;
@@ -2473,7 +2623,7 @@ function wireInk(pgEl, inkC, strokeC, lassoC, hitbox, actualPage, display, pid) 
   const activePointers = new Map();
   let pendingRaf = null;
   let twoFingerPan = null;
-  const stageEl = document.querySelector('.stage');
+  const stageEl2 = document.querySelector('.stage');
   const getTwoFingerCenter = () => {
     if (activePointers.size < 2) return null;
     const pts = Array.from(activePointers.values());
@@ -2514,6 +2664,8 @@ function wireInk(pgEl, inkC, strokeC, lassoC, hitbox, actualPage, display, pid) 
     const list = strokes.get(pid) || [];
     strokes.set(pid, list.concat([newStroke]));
     pushUndo({ kind:'ink', pageId:pid, added:[newStroke], removed:[] });
+    // Persist chunk
+    queueStrokePut(pid, newStroke);
     markPageDirty(pid);
     hasUnexportedEdits = true;
     updateDirtyBadge();
@@ -2543,7 +2695,6 @@ function wireInk(pgEl, inkC, strokeC, lassoC, hitbox, actualPage, display, pid) 
   };
   const queuePt = pt => { if (!stroke) return; stroke.pending.push(pt); if (!pendingRaf) pendingRaf = requestAnimationFrame(flushPending); };
 
-  /* Text editor with live font-size control */
   const openTextEditor = (x, y, existing) => {
     if (textEdit) textEdit.remove();
     const rect = hitbox.getBoundingClientRect();
@@ -2574,8 +2725,10 @@ function wireInk(pgEl, inkC, strokeC, lassoC, hitbox, actualPage, display, pid) 
         const list = strokes.get(pid) || [];
         const idx = list.findIndex(s => s.id === existing.id);
         if (idx >= 0) {
-          list[idx] = { ...list[idx], fontSize: newSize };
+          const updated = { ...list[idx], fontSize: newSize };
+          list[idx] = updated;
           redrawPageStrokes(pid);
+          queueStrokePut(pid, updated);
           markPageDirty(pid);
           queueThumbRefresh(pid);
         }
@@ -2603,11 +2756,11 @@ function wireInk(pgEl, inkC, strokeC, lassoC, hitbox, actualPage, display, pid) 
             const removed = [{ id: wasExisting.id, index: idx, stroke: list[idx] }];
             applyInkDelta(pid, [], removed, true);
             pushUndo({ kind:'ink', pageId:pid, added:[], removed });
-            markPageDirty(pid);
             redrawPageStrokes(pid);
             queueThumbRefresh(pid);
             hasUnexportedEdits = true;
             updateDirtyBadge();
+            flushStrokeQueue();
           }
         }
         return;
@@ -2631,6 +2784,7 @@ function wireInk(pgEl, inkC, strokeC, lassoC, hitbox, actualPage, display, pid) 
       queueThumbRefresh(pid);
       hasUnexportedEdits = true;
       updateDirtyBadge();
+      flushStrokeQueue();
     };
     wrap.addEventListener('keydown', ev => {
       if (ev.key === 'Escape') { ev.preventDefault(); wrap.remove(); if (textEdit === wrap) textEdit = null; editingTextCtx = null; }
@@ -2669,7 +2823,6 @@ function wireInk(pgEl, inkC, strokeC, lassoC, hitbox, actualPage, display, pid) 
     acquireWakeLock();
     bounceFocus();
 
-    /* ── Edit element tool ── */
     if (tool === 'edit') {
       const hit = hitTestStrokes(pid, pt.bx, pt.by, 10);
       if (hit) selectStrokeForEdit(pid, hit);
@@ -2748,11 +2901,11 @@ function wireInk(pgEl, inkC, strokeC, lassoC, hitbox, actualPage, display, pid) 
       if (activePointers.size >= 2) {
         ev.preventDefault();
         const c = getTwoFingerCenter();
-        if (c && stageEl) {
+        if (c && stageEl2) {
           if (!twoFingerPan) twoFingerPan = { x:c.x, y:c.y };
           const dx = c.x - twoFingerPan.x;
           const dy = c.y - twoFingerPan.y;
-          if (dx || dy) { stageEl.scrollLeft -= dx; stageEl.scrollTop -= dy; twoFingerPan = c; }
+          if (dx || dy) { stageEl2.scrollLeft -= dx; stageEl2.scrollTop -= dy; twoFingerPan = c; }
         }
         return;
       }
@@ -2986,6 +3139,9 @@ function wireInk(pgEl, inkC, strokeC, lassoC, hitbox, actualPage, display, pid) 
     const kept = before.filter(s => !removedIds.has(s.id));
     strokes.set(pid, kept.concat(moved));
     pushUndo({ kind:'ink', pageId:pid, added:moved, removed });
+    // Queue: delete old strokes, put new ones
+    for (const r of removed) queueStrokeDel(pid, r.id);
+    for (const s of moved) queueStrokePut(pid, s);
     markPageDirty(pid);
     hasUnexportedEdits = true;
     updateDirtyBadge();
@@ -2993,6 +3149,7 @@ function wireInk(pgEl, inkC, strokeC, lassoC, hitbox, actualPage, display, pid) 
     lctx.clearRect(0, 0, lassoC.width, lassoC.height);
     redrawPageStrokes(pid);
     queueThumbRefresh(pid);
+    flushStrokeQueue();
     haptic(8);
   };
   hitbox._commitLasso = commitLasso;
@@ -3475,7 +3632,6 @@ function updatePopContent() {
     $('#popVal').textContent = curSize + ' px';
     if (slVal) slVal.textContent = String(curSize);
     pressureRow.style.display='none';
-    /* Colors row */
     if (pc) {
       pc.style.display = 'grid';
       const cols = (recentColors.length ? recentColors : ['#0A0B0F','#FF3B30','#0A7AFF','#30A46C','#A855F7','#FFD60A','#FF9F0A']).slice(0, 7);
@@ -4105,6 +4261,8 @@ function duplicatePage(d) {
   const list = strokes.get(srcId) || [];
   const cloned = list.map(s => ({ ...s, id: uid() }));
   strokes.set(newPid, cloned);
+  // Queue cloned strokes for persistence
+  for (const s of cloned) queueStrokePut(newPid, s);
   markPageDirty(newPid);
   const after = { order: pageOrder.slice(), ids: pageIdList.slice() };
   pushUndo({ kind:'pageop', before, after });
@@ -4114,6 +4272,7 @@ function duplicatePage(d) {
   hasUnexportedEdits = true;
   updateDirtyBadge();
   toast('Page duplicated');
+  flushStrokeQueue();
 }
 let reclaimTimer = null;
 function scheduleReclaimOrphans() {
@@ -4123,7 +4282,13 @@ function scheduleReclaimOrphans() {
       const live = new Set(pageIdList);
       for (const pid of Array.from(strokes.keys())) if (!live.has(pid)) strokes.delete(pid);
       for (const pid of Array.from(bookmarks.keys())) if (!live.has(pid)) bookmarks.delete(pid);
-      const all = await idbBy('pages','fid',fid);
+      // Reclaim orphan chunked strokes
+      const recs = await idbBy('strokes','fid_pid').catch(() => []);
+      const delKeys = [];
+      for (const r of recs) if (r.fid === fid && !live.has(r.pageId)) delKeys.push([r.fid, r.pageId, r.strokeId]);
+      if (delKeys.length) await idbBatchDelStrokes(delKeys);
+      // Reclaim orphan legacy pages
+      const all = await idbBy('pages','fid',fid).catch(() => []);
       for (const p of all) if (!live.has(p.pageId)) { try { await idbDel('pages', [fid, p.pageId]); } catch(_) {} }
       await saveSettings();
     } catch(e) { console.error('reclaim failed', e); }
@@ -4394,8 +4559,9 @@ async function backupAll() {
     toast('Preparing backup…', null, 'busy');
     const files = await idbAll('files');
     const allPages = await idbAll('pages');
+    const allStrokes = await idbAll('strokes').catch(() => []);
     const allSettings = await idbAll('settings');
-    const header = { version: BACKUP_VERSION, createdAt: now(), files: [], pages: allPages, settings: allSettings };
+    const header = { version: BACKUP_VERSION, createdAt: now(), files: [], pages: allPages, strokes: allStrokes, settings: allSettings };
     const parts = [];
     let dataOffset = 0;
     for (const f of files) {
@@ -4460,6 +4626,14 @@ async function restoreFromBackup(file) {
         }
         const { dataOffset, dataLength, ...rest } = f;
         await idbPut('files', { ...rest, id:newId, name: (rest.name || 'Restored') + ' (restored)', data: dataBlob, lastOpened: now(), deleted: false });
+        // Restore chunked strokes if available, else legacy pages
+        if (Array.isArray(header.strokes) && header.strokes.length) {
+          const strokePuts = [];
+          for (const r of header.strokes) {
+            if (r.fid === f.id) strokePuts.push({ fid:newId, pageId:r.pageId, strokeId:r.strokeId, data:r.data });
+          }
+          if (strokePuts.length) await idbBatchPutStrokes(strokePuts);
+        }
         for (const p of header.pages.filter(p => p.fid === f.id)) {
           if (p.strokes) await idbPut('pages', { fid:newId, pageId:p.pageId, strokes:p.strokes });
         }
@@ -4563,7 +4737,8 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && !s
 on(window, 'online', updateStatusBar);
 on(window, 'offline', updateStatusBar);
 
-setInterval(() => { if (fid && dirtyPages.size) flushPageSaves().catch(() => {}); }, 2500);
+/* Periodic safety flush — every 2s, only if there is dirty state */
+setInterval(() => { if (fid && (dirtyPages.size || pendingStrokePuts.size || pendingStrokeDels.size)) flushPageSaves().catch(() => {}); }, 2000);
 
 /* ═══════════════════════════════════════════════════════════════════════════
    CLOSE EDITOR
@@ -5016,8 +5191,7 @@ on(window, 'pagehide', () => {
 on(window, 'beforeunload', () => { if (fid) flushPageSaves().catch(() => {}); });
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   DEVELOPER PANEL
-   ═══════════════════════════════════════════════════════════════════════════ */
+   DEVELOPER PANEL   ═══════════════════════════════════════════════════════════════════════════ */
 function openDevPanel(open) {
   $('#devPanel')?.classList.toggle('on', open);
   $('#dbg')?.classList.toggle('on', open);
