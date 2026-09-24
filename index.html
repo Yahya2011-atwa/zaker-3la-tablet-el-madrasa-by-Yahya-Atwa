@@ -912,8 +912,8 @@ const UNDO_STACK_MAX = 200;
 const BACKUP_MAGIC = 'ZK19';
 const BACKUP_VERSION = 24;
 /* HIGH-QUALITY EXPORT */
-const EXPORT_MAX_PX = 3600;
-const EXPORT_RASTER_DPR = 3.0;
+const EXPORT_MAX_PX = LOW ? 6000 : 10000;
+const EXPORT_RASTER_DPR = LOW ? 4.0 : 6.0;
 const DB_VERSION = 3;
 const POINT_FORMAT_VERSION = 2;
 const SAVE_DEBOUNCE_MS = 150;
@@ -1544,6 +1544,8 @@ function renderOneStroke(ctx, s, sx, sy, bw, bh) {
 }
 function renderStrokesToCanvas(canvas, strokeList, bw, bh) {
   const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (!strokeList || !strokeList.length) return;
   const sx = canvas.width / bw, sy = canvas.height / bh;
@@ -4238,6 +4240,7 @@ function isVectorizable(strokeList) {
   if (!strokeList || !strokeList.length) return false;
   for (const s of strokeList) {
     if (s.tool === 'er' || s.tool === 'text' || s.tool === 'shape') return false;
+    if (s.tool === 'hl' && (s.size || 22) > 15) return false;
     const pts = s.points;
     if (!pts || pts.length < 2) continue;
     const w0 = pts[0].w || s.size;
